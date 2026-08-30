@@ -2,7 +2,6 @@ name: Dorm Electricity Monitor
 
 on:
   workflow_dispatch:
-
   schedule:
     - cron: "5 * * * *"
 
@@ -23,6 +22,4 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-
-        run: |
-          python collector.py
+        run: python collector.py
