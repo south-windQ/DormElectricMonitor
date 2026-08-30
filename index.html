@@ -1,1 +1,973 @@
-git
+<!dcd C:\Users\29782\Desktop\DormElectricMonitoroctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#f4f7fb">
+  <title>寝室电费看板</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+  <style>
+    :root{
+      --bg:#f4f7fb;
+      --card:rgba(255,255,255,.94);
+      --text:#172033;
+      --muted:#748096;
+      --border:#e6ebf2;
+      --blue:#4377f6;
+      --blue-dark:#295bd3;
+      --green:#12a57a;
+      --orange:#f59e42;
+      --red:#e95b68;
+      --shadow:0 14px 42px rgba(35,52,86,.08);
+      --radius:22px;
+    }
+    *{box-sizing:border-box}
+    html{color-scheme:light}
+    body{
+      margin:0;
+      min-height:100vh;
+      font-family:Inter,system-ui,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+      color:var(--text);
+      background:
+        radial-gradient(circle at 5% 0,rgba(67,119,246,.10),transparent 27%),
+        radial-gradient(circle at 95% 8%,rgba(18,165,122,.09),transparent 25%),
+        var(--bg);
+    }
+    button{font:inherit}
+    .wrap{max-width:1180px;margin:auto;padding:24px 18px 42px}
+    .top{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:18px;
+      margin:4px 0 20px;
+    }
+    .brand{display:flex;align-items:center;gap:13px;min-width:0}
+    .logo{
+      width:48px;height:48px;display:grid;place-items:center;flex:0 0 auto;
+      color:white;font-size:23px;border-radius:16px;
+      background:linear-gradient(145deg,#5b8cff,#3166e8);
+      box-shadow:0 12px 28px rgba(67,119,246,.25);
+    }
+    h1{font-size:25px;margin:0;letter-spacing:-.4px}
+    .sub{
+      display:flex;align-items:center;gap:9px;flex-wrap:wrap;
+      font-size:12px;color:var(--muted);margin-top:5px;
+    }
+    .dot{width:4px;height:4px;border-radius:50%;background:#bdc6d3}
+    .actions{display:flex;align-items:center;gap:9px}
+    .btn{
+      border:1px solid var(--border);background:rgba(255,255,255,.9);
+      color:#455168;border-radius:12px;padding:10px 13px;cursor:pointer;
+      box-shadow:0 5px 16px rgba(35,52,86,.04);transition:.18s ease;
+    }
+    .btn:hover{border-color:#cfd8e6;transform:translateY(-1px)}
+    .btn.primary{background:var(--blue);border-color:var(--blue);color:white}
+    .btn:disabled{opacity:.58;cursor:wait;transform:none}
+    .status{
+      display:inline-flex;align-items:center;gap:7px;
+      padding:6px 10px;border-radius:999px;
+      color:var(--green);background:#e9f8f3;font-weight:650;
+    }
+    .status::before{
+      content:"";width:7px;height:7px;border-radius:50%;
+      background:currentColor;box-shadow:0 0 0 4px rgba(18,165,122,.10);
+    }
+    .status.loading{color:var(--blue);background:#edf3ff}
+    .status.warning{color:#b66b19;background:#fff5e8}
+    .status.error{color:#c43d4a;background:#fff0f1}
+    .notice{
+      display:none;margin-bottom:14px;padding:12px 14px;border-radius:14px;
+      border:1px solid #ffd7a8;background:#fff8ee;color:#92551a;
+      font-size:13px;line-height:1.55;
+    }
+    .notice.show{display:block}
+    .notice.error{border-color:#fecaca;background:#fff2f3;color:#a72f3b}
+    .hero{
+      display:grid;grid-template-columns:1.35fr repeat(3,1fr);
+      gap:14px;margin-bottom:14px;
+    }
+    .card{
+      background:var(--card);border:1px solid var(--border);
+      border-radius:var(--radius);box-shadow:var(--shadow);
+      backdrop-filter:blur(10px);
+    }
+    .metric{padding:20px;min-height:150px;position:relative;overflow:hidden}
+    .metric::after{
+      content:"";position:absolute;width:110px;height:110px;right:-36px;top:-43px;
+      border-radius:50%;background:currentColor;opacity:.05;
+    }
+    .metric.balance{
+      color:white;border:0;
+      background:linear-gradient(145deg,#467cf9,#2e60d4);
+      box-shadow:0 18px 40px rgba(46,96,212,.22);
+    }
+    .label{font-size:13px;color:var(--muted);margin-bottom:18px}
+    .balance .label,.balance .note,.balance .unit{color:rgba(255,255,255,.72)}
+    .value{
+      display:flex;align-items:baseline;gap:5px;
+      font-size:clamp(29px,4vw,40px);font-weight:780;letter-spacing:-1px;
+    }
+    .unit{font-size:13px;color:var(--muted);font-weight:550;letter-spacing:0}
+    .note{font-size:12px;color:var(--muted);margin-top:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .strip{
+      display:grid;grid-template-columns:repeat(4,1fr);
+      gap:10px;margin-bottom:14px;
+    }
+    .mini{padding:15px 17px}
+    .mini-label{font-size:12px;color:var(--muted);margin-bottom:7px}
+    .mini-value{font-size:20px;font-weight:740}
+    .mini-value span{font-size:12px;color:var(--muted);font-weight:500;margin-left:3px}
+    .layout{
+      display:grid;grid-template-columns:minmax(0,1.55fr) minmax(330px,.85fr);
+      gap:14px;margin-bottom:14px;
+    }
+    .panel{padding:20px;min-width:0}
+    .panel-head{
+      display:flex;align-items:flex-start;justify-content:space-between;
+      gap:12px;margin-bottom:15px;
+    }
+    .panel h2{font-size:16px;margin:0}
+    .desc{font-size:12px;color:var(--muted);margin-top:5px}
+    .tabs{display:flex;gap:4px;padding:4px;border-radius:10px;background:#f2f5f9}
+    .tab{
+      border:0;background:transparent;color:var(--muted);
+      padding:6px 9px;border-radius:7px;font-size:12px;cursor:pointer;
+    }
+    .tab.active{background:white;color:var(--blue);box-shadow:0 3px 10px rgba(35,52,86,.08)}
+    .chartbox{height:286px}
+    .chartbox.small{height:250px}
+    .activity-list{max-height:313px;overflow:auto}
+    .activity{
+      display:grid;grid-template-columns:36px 1fr auto;
+      gap:10px;align-items:center;padding:11px 1px;
+      border-bottom:1px solid var(--border);
+    }
+    .activity:last-child{border-bottom:0}
+    .activity-icon{
+      width:34px;height:34px;display:grid;place-items:center;border-radius:11px;
+      color:var(--blue);background:#edf3ff;font-weight:800;
+    }
+    .activity.recharge .activity-icon{color:var(--green);background:#eaf8f3}
+    .activity-title{font-size:13px;font-weight:680}
+    .activity-time{font-size:11px;color:var(--muted);margin-top:3px}
+    .activity-amount{font-size:13px;font-weight:740}
+    .activity.recharge .activity-amount{color:var(--green)}
+    .table-wrap{overflow:auto}
+    table{width:100%;border-collapse:collapse}
+    th,td{
+      padding:11px 8px;border-bottom:1px solid var(--border);
+      font-size:12px;text-align:left;white-space:nowrap;
+    }
+    th{color:var(--muted);font-weight:650}
+    td:last-child,th:last-child{text-align:right}
+    .empty{padding:70px 10px;text-align:center;color:var(--muted);font-size:13px}
+    .footer{
+      font-size:12px;line-height:1.7;color:var(--muted);
+      text-align:center;margin:20px auto 4px;max-width:920px;
+    }
+    .toast{
+      position:fixed;right:20px;bottom:20px;z-index:30;
+      max-width:min(360px,calc(100% - 40px));padding:12px 15px;border-radius:12px;
+      background:#172033;color:white;box-shadow:0 16px 40px rgba(23,32,51,.22);
+      font-size:13px;opacity:0;transform:translateY(80px);transition:.22s ease;
+    }
+    .toast.show{opacity:1;transform:translateY(0)}
+    .toast.error{background:#862f39}
+    @media(max-width:940px){
+      .hero{grid-template-columns:1fr 1fr}
+      .layout{grid-template-columns:1fr}
+    }
+    @media(max-width:640px){
+      .wrap{padding:14px 10px 32px}
+      .top{align-items:flex-start}
+      .logo{width:42px;height:42px;border-radius:14px}
+      h1{font-size:21px}
+      .actions{gap:6px}
+      .btn{padding:9px 10px;font-size:12px}
+      .btn.export{display:none}
+      .hero{grid-template-columns:1fr;gap:10px}
+      .metric{min-height:132px;padding:18px}
+      .label{margin-bottom:12px}
+      .strip{grid-template-columns:1fr 1fr}
+      .panel{padding:16px 12px;border-radius:18px}
+      .panel-head{flex-direction:column}
+      .chartbox{height:250px}
+      .chartbox.small{height:230px}
+    }
+  </style>
+</head>
+<body>
+<main class="wrap">
+  <header class="top">
+    <div class="brand">
+      <div class="logo">⚡</div>
+      <div>
+        <h1>寝室电费看板</h1>
+        <div class="sub">
+          <span id="status" class="status loading">正在读取</span>
+          <span class="dot"></span>
+          <span id="lastQuery">采集每小时执行 · 网页每 5 分钟刷新</span>
+        </div>
+      </div>
+    </div>
+    <div class="actions">
+      <button id="exportBtn" class="btn export" type="button">导出数据</button>
+      <button id="refreshBtn" class="btn primary" type="button">刷新数据</button>
+    </div>
+  </header>
+
+  <div id="notice" class="notice"></div>
+
+  <section class="hero">
+    <article class="card metric balance">
+      <div class="label">当前余额</div>
+      <div class="value"><span id="balance">--</span><span class="unit">元</span></div>
+      <div id="balanceNote" class="note">等待第一条数据</div>
+    </article>
+    <article class="card metric">
+      <div class="label">今日用电</div>
+      <div class="value"><span id="todayUsage">--</span><span class="unit">元</span></div>
+      <div id="todayCompare" class="note">昨日 -- 元</div>
+    </article>
+    <article class="card metric">
+      <div class="label">本月累计用电</div>
+      <div class="value"><span id="monthUsage">--</span><span class="unit">元</span></div>
+      <div id="monthProjectionNote" class="note">月末预计 -- 元</div>
+    </article>
+    <article class="card metric">
+      <div class="label">预计还可使用</div>
+      <div class="value"><span id="remainingDays">--</span><span class="unit">天</span></div>
+      <div class="note">按最近 7 个有效日的日均估算</div>
+    </article>
+  </section>
+
+  <section class="strip">
+    <article class="card mini">
+      <div class="mini-label">昨日用电</div>
+      <div class="mini-value"><b id="yesterdayUsage">--</b><span>元</span></div>
+    </article>
+    <article class="card mini">
+      <div class="mini-label">最近有效日均</div>
+      <div class="mini-value"><b id="averageDaily">--</b><span>元/天</span></div>
+    </article>
+    <article class="card mini">
+      <div class="mini-label">本月充值</div>
+      <div class="mini-value"><b id="monthRecharge">--</b><span>元</span></div>
+    </article>
+    <article class="card mini">
+      <div class="mini-label">月末用电预计</div>
+      <div class="mini-value"><b id="projectedMonth">--</b><span>元</span></div>
+    </article>
+  </section>
+
+  <section class="layout">
+    <article class="card panel">
+      <div class="panel-head">
+        <div>
+          <h2>最近 72 小时余额</h2>
+          <div class="desc">余额下降代表用电，余额上升代表充值</div>
+        </div>
+      </div>
+      <div class="chartbox"><canvas id="balanceChart"></canvas></div>
+    </article>
+
+    <article class="card panel">
+      <div class="panel-head">
+        <div>
+          <h2>最近余额变动</h2>
+          <div class="desc">相同余额的定时采集不会重复显示</div>
+        </div>
+      </div>
+      <div id="activityList" class="activity-list"></div>
+    </article>
+  </section>
+
+  <section class="layout">
+    <article class="card panel">
+      <div class="panel-head">
+        <div>
+          <h2>每日用电</h2>
+          <div class="desc">跨午夜区间会按时长分摊到两个自然日</div>
+        </div>
+        <div class="tabs">
+          <button class="tab active" data-days="7" type="button">近 7 天</button>
+          <button class="tab" data-days="30" type="button">近 30 天</button>
+        </div>
+      </div>
+      <div class="chartbox"><canvas id="dailyChart"></canvas></div>
+    </article>
+
+    <article class="card panel">
+      <div class="panel-head">
+        <div>
+          <h2>近 6 个月统计</h2>
+          <div class="desc">用电与充值分别展示</div>
+        </div>
+      </div>
+      <div class="chartbox small"><canvas id="monthlyChart"></canvas></div>
+    </article>
+  </section>
+
+  <section class="card panel">
+    <div class="panel-head">
+      <div>
+        <h2>最近原始记录</h2>
+        <div id="recordDesc" class="desc">来自 Supabase electricity 表</div>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>北京时间</th><th>记录 ID</th><th>与上次间隔</th><th>余额</th></tr>
+        </thead>
+        <tbody id="recentBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="footer">
+    统计说明：用电金额取相邻采集余额的下降值，余额上升会作为充值记录。
+    如果同一采集间隔内既充值又用电，仅凭余额无法精确拆分，充值所在区间的实际用电可能被低估。
+    网页只应使用 Supabase publishable/anon key，并确保 electricity 表已启用只读 RLS 策略。
+  </div>
+</main>
+<div id="toast" class="toast"></div>
+
+<script>
+const SUPABASE_URL = "https://qqlvyohgxbmvbtxgvwxw.supabase.co";
+const SUPABASE_PUBLIC_KEY = "sb_publishable_paoG7O2340i2xo2igiLJbw_6ZZTY1UK";
+
+const TZ = "Asia/Shanghai";
+const CHINA_OFFSET = "+08:00";
+const PAGE_SIZE = 1000;
+const MAX_PAGES = 10;
+const LOW_BALANCE_THRESHOLD = 20;
+const BALANCE_EPSILON = 0.005;
+const NORMAL_GAP_HOURS = 2.5;
+const AUTO_REFRESH_MS = 5 * 60 * 1000;
+
+let balanceChart;
+let dailyChart;
+let monthlyChart;
+let currentRows = [];
+let currentAnalysis = null;
+let dailyRange = 7;
+let refreshing = false;
+
+const $ = id => document.getElementById(id);
+const money = value => Number.isFinite(Number(value)) ? Number(value).toFixed(2) : "--";
+
+function chinaParts(value){
+  const parts = new Intl.DateTimeFormat("zh-CN", {
+    timeZone:TZ,
+    year:"numeric",month:"2-digit",day:"2-digit",
+    hour:"2-digit",minute:"2-digit",second:"2-digit",
+    hourCycle:"h23"
+  }).formatToParts(new Date(value));
+  const result = {};
+  for(const part of parts){
+    if(part.type !== "literal") result[part.type] = part.value;
+  }
+  return result;
+}
+
+function dayKey(value){
+  const p = chinaParts(value);
+  return `${p.year}-${p.month}-${p.day}`;
+}
+
+function monthKey(value){
+  return dayKey(value).slice(0,7);
+}
+
+function cnTime(value, withYear=false){
+  return new Intl.DateTimeFormat("zh-CN", {
+    timeZone:TZ,
+    year:withYear ? "numeric" : undefined,
+    month:"2-digit",day:"2-digit",
+    hour:"2-digit",minute:"2-digit",
+    hourCycle:"h23"
+  }).format(new Date(value));
+}
+
+function addDaysToKey(key, amount){
+  const [year,month,day] = key.split("-").map(Number);
+  const value = new Date(Date.UTC(year, month - 1, day + amount));
+  return value.toISOString().slice(0,10);
+}
+
+function dayStartMs(key){
+  return Date.parse(`${key}T00:00:00${CHINA_OFFSET}`);
+}
+
+function monthKeys(count){
+  const p = chinaParts(new Date());
+  const result = [];
+  for(let offset = count - 1; offset >= 0; offset--){
+    const value = new Date(Date.UTC(
+      Number(p.year),
+      Number(p.month) - 1 - offset,
+      1
+    ));
+    result.push(value.toISOString().slice(0,7));
+  }
+  return result;
+}
+
+function lastDayKeys(count, endKey=dayKey(new Date())){
+  const result = [];
+  for(let offset = count - 1; offset >= 0; offset--){
+    result.push(addDaysToKey(endKey, -offset));
+  }
+  return result;
+}
+
+function daysInMonth(key){
+  const [year,month] = key.split("-").map(Number);
+  return new Date(Date.UTC(year, month, 0)).getUTCDate();
+}
+
+function splitIntervalByDay(startMs, endMs, amount){
+  if(!(endMs > startMs) || !(amount > 0)) return [];
+  const totalMs = endMs - startMs;
+  const result = [];
+  let cursor = startMs;
+
+  while(cursor < endMs){
+    const key = dayKey(cursor);
+    const nextBoundary = dayStartMs(addDaysToKey(key, 1));
+    const segmentEnd = Math.min(endMs, nextBoundary);
+    result.push({
+      key,
+      value: amount * (segmentEnd - cursor) / totalMs
+    });
+    cursor = segmentEnd;
+  }
+  return result;
+}
+
+function ensureDay(target, key){
+  if(!target[key]){
+    target[key] = {usage:0,recharge:0,coverageHours:0};
+  }
+  return target[key];
+}
+
+function cleanRows(rows){
+  const byId = new Map();
+
+  for(const row of rows){
+    const timestamp = new Date(row.created_at).getTime();
+    const balance = Number(row.balance);
+    if(!Number.isFinite(timestamp) || !Number.isFinite(balance) || balance < 0){
+      continue;
+    }
+    const normalized = {
+      id:row.id,
+      created_at:new Date(timestamp).toISOString(),
+      balance
+    };
+    const key = row.id == null
+      ? `${normalized.created_at}|${normalized.balance}`
+      : String(row.id);
+    byId.set(key, normalized);
+  }
+
+  return [...byId.values()].sort(
+    (a,b) => new Date(a.created_at) - new Date(b.created_at)
+  );
+}
+
+function analyze(rows){
+  const byDay = {};
+  const activities = [];
+  let longGapCount = 0;
+  let rechargeIntervalCount = 0;
+
+  for(let index = 1; index < rows.length; index++){
+    const previous = rows[index - 1];
+    const current = rows[index];
+    const startMs = new Date(previous.created_at).getTime();
+    const endMs = new Date(current.created_at).getTime();
+    if(!(endMs > startMs)) continue;
+
+    const gapHours = (endMs - startMs) / 3600000;
+    if(gapHours > NORMAL_GAP_HOURS) longGapCount++;
+
+    if(gapHours <= NORMAL_GAP_HOURS){
+      for(const part of splitIntervalByDay(startMs, endMs, gapHours)){
+        ensureDay(byDay, part.key).coverageHours += part.value;
+      }
+    }
+
+    const difference = previous.balance - current.balance;
+    if(Math.abs(difference) < BALANCE_EPSILON) continue;
+
+    if(difference > 0){
+      for(const part of splitIntervalByDay(startMs, endMs, difference)){
+        ensureDay(byDay, part.key).usage += part.value;
+      }
+      activities.push({
+        type:"usage",
+        time:current.created_at,
+        amount:difference,
+        fromBalance:previous.balance,
+        toBalance:current.balance,
+        gapHours
+      });
+    }else{
+      const key = dayKey(current.created_at);
+      const amount = -difference;
+      ensureDay(byDay, key).recharge += amount;
+      rechargeIntervalCount++;
+      activities.push({
+        type:"recharge",
+        time:current.created_at,
+        amount,
+        fromBalance:previous.balance,
+        toBalance:current.balance,
+        gapHours
+      });
+    }
+  }
+
+  const months = {};
+  for(const [key,value] of Object.entries(byDay)){
+    const month = key.slice(0,7);
+    if(!months[month]) months[month] = {usage:0,recharge:0};
+    months[month].usage += value.usage;
+    months[month].recharge += value.recharge;
+  }
+
+  const today = dayKey(new Date());
+  const yesterday = addDaysToKey(today, -1);
+  const currentMonth = today.slice(0,7);
+  const averageCandidates = lastDayKeys(21, yesterday)
+    .map(key => ({key,...(byDay[key] || {usage:0,recharge:0,coverageHours:0})}))
+    .filter(item => item.coverageHours >= 18)
+    .slice(-7);
+
+  const fallbackCandidates = averageCandidates.length
+    ? averageCandidates
+    : lastDayKeys(7, yesterday)
+        .map(key => ({key,...(byDay[key] || {usage:0,recharge:0,coverageHours:0})}))
+        .filter(item => item.coverageHours > 0);
+
+  const averageDaily = fallbackCandidates.length
+    ? fallbackCandidates.reduce((sum,item) => sum + item.usage, 0) / fallbackCandidates.length
+    : 0;
+
+  const latest = rows.at(-1);
+
+  // 月末预计 = 本月已经发生的实际用电 + 今天之后剩余自然日 × 最近有效日均。
+  // 这样不会用“日均 × 整月天数”覆盖掉本月已经采集到的真实数据。
+  const currentMonthUsage = months[currentMonth]?.usage || 0;
+  const todayOfMonth = Number(today.slice(-2));
+  const remainingCalendarDays = Math.max(
+    0,
+    daysInMonth(currentMonth) - todayOfMonth
+  );
+  const projectedMonth = currentMonthUsage + averageDaily * remainingCalendarDays;
+
+  const remainingDays = latest && averageDaily > BALANCE_EPSILON
+    ? latest.balance / averageDaily
+    : null;
+
+  return {
+    byDay,
+    months,
+    activities,
+    longGapCount,
+    rechargeIntervalCount,
+    todayUsage:byDay[today]?.usage || 0,
+    yesterdayUsage:byDay[yesterday]?.usage || 0,
+    monthUsage:currentMonthUsage,
+    monthRecharge:months[currentMonth]?.recharge || 0,
+    averageDaily,
+    projectedMonth,
+    remainingDays,
+    averageDayCount:fallbackCandidates.length
+  };
+}
+
+async function supabaseRequest(params){
+  const url = new URL(`${SUPABASE_URL}/rest/v1/electricity`);
+  for(const [key,value] of Object.entries(params)){
+    url.searchParams.set(key, value);
+  }
+
+  const response = await fetch(url, {
+    cache:"no-store",
+    headers:{
+      apikey:SUPABASE_PUBLIC_KEY,
+      Authorization:`Bearer ${SUPABASE_PUBLIC_KEY}`
+    }
+  });
+
+  if(!response.ok){
+    const message = await response.text();
+    throw new Error(`Supabase 读取失败：HTTP ${response.status}\n${message}`);
+  }
+  return response.json();
+}
+
+async function loadData(){
+  if(!SUPABASE_URL.startsWith("https://")){
+    throw new Error("请填写正确的 SUPABASE_URL。");
+  }
+  if(!SUPABASE_PUBLIC_KEY || /service_role|sb_secret_/i.test(SUPABASE_PUBLIC_KEY)){
+    throw new Error("网页只能使用 Supabase publishable/anon key，不能使用 service_role 或 secret key。");
+  }
+
+  const firstMonth = monthKeys(6)[0];
+  const windowStart = `${firstMonth}-01`;
+  const startIso = new Date(dayStartMs(windowStart)).toISOString();
+
+  const anchorPromise = supabaseRequest({
+    select:"id,created_at,balance",
+    created_at:`lt.${startIso}`,
+    order:"created_at.desc,id.desc",
+    limit:"1"
+  });
+
+  const firstPagePromise = supabaseRequest({
+    select:"id,created_at,balance",
+    created_at:`gte.${startIso}`,
+    order:"created_at.asc,id.asc",
+    limit:String(PAGE_SIZE),
+    offset:"0"
+  });
+
+  const [anchor,firstPage] = await Promise.all([
+    anchorPromise,
+    firstPagePromise
+  ]);
+  const collected = [...anchor,...firstPage];
+  let page = firstPage;
+  let pageNumber = 1;
+
+  while(page.length === PAGE_SIZE && pageNumber < MAX_PAGES){
+    page = await supabaseRequest({
+      select:"id,created_at,balance",
+      created_at:`gte.${startIso}`,
+      order:"created_at.asc,id.asc",
+      limit:String(PAGE_SIZE),
+      offset:String(pageNumber * PAGE_SIZE)
+    });
+    collected.push(...page);
+    pageNumber++;
+  }
+
+  const rows = cleanRows(collected);
+  if(!rows.length){
+    throw new Error("Supabase electricity 表中还没有可用数据。");
+  }
+  if(page.length === PAGE_SIZE && pageNumber >= MAX_PAGES){
+    throw new Error("半年数据超过当前 10000 条读取上限，请提高 MAX_PAGES。");
+  }
+  return rows;
+}
+
+function chartBaseOptions(){
+  return {
+    responsive:true,
+    maintainAspectRatio:false,
+    interaction:{mode:"index",intersect:false},
+    animation:{duration:350},
+    scales:{
+      x:{
+        grid:{display:false},
+        ticks:{color:"#748096",maxRotation:0,autoSkip:true,maxTicksLimit:8}
+      },
+      y:{
+        beginAtZero:true,
+        grid:{color:"rgba(116,128,150,.12)"},
+        ticks:{color:"#748096",padding:7}
+      }
+    },
+    plugins:{
+      legend:{display:false},
+      tooltip:{
+        backgroundColor:"#172033",
+        padding:10,
+        titleFont:{size:12},
+        bodyFont:{size:12},
+        displayColors:false
+      }
+    }
+  };
+}
+
+function renderCharts(rows, analysis){
+  if(typeof Chart === "undefined"){
+    throw new Error("Chart.js 加载失败，请检查网络是否能访问 jsDelivr。");
+  }
+
+  const latestMs = new Date(rows.at(-1).created_at).getTime();
+  const balanceRows = rows.filter(
+    row => new Date(row.created_at).getTime() >= latestMs - 72 * 3600000
+  );
+
+  balanceChart?.destroy();
+  const balanceOptions = chartBaseOptions();
+  balanceOptions.scales.y.beginAtZero = false;
+  balanceChart = new Chart($("balanceChart"), {
+    type:"line",
+    data:{
+      labels:balanceRows.map(row => cnTime(row.created_at)),
+      datasets:[{
+        data:balanceRows.map(row => row.balance),
+        borderColor:"#4377f6",
+        backgroundColor:"rgba(67,119,246,.11)",
+        borderWidth:2.2,
+        tension:.28,
+        fill:true,
+        pointRadius:balanceRows.length > 80 ? 0 : 2,
+        pointHoverRadius:4
+      }]
+    },
+    options:balanceOptions
+  });
+
+  const dailyKeys = lastDayKeys(dailyRange);
+  dailyChart?.destroy();
+  const dailyOptions = chartBaseOptions();
+  dailyOptions.plugins.tooltip.callbacks = {
+    label:context => `用电 ${money(context.raw)} 元`
+  };
+  dailyChart = new Chart($("dailyChart"), {
+    type:"bar",
+    data:{
+      labels:dailyKeys.map(key => key.slice(5).replace("-","/")),
+      datasets:[{
+        data:dailyKeys.map(key => analysis.byDay[key]?.usage || 0),
+        backgroundColor:"rgba(18,165,122,.78)",
+        hoverBackgroundColor:"#12a57a",
+        borderRadius:7,
+        maxBarThickness:42
+      }]
+    },
+    options:dailyOptions
+  });
+
+  const keys = monthKeys(6);
+  monthlyChart?.destroy();
+  const monthlyOptions = chartBaseOptions();
+  monthlyOptions.plugins.legend = {
+    display:true,
+    position:"bottom",
+    labels:{usePointStyle:true,boxWidth:7,color:"#748096",padding:14}
+  };
+  monthlyOptions.plugins.tooltip.displayColors = true;
+  monthlyChart = new Chart($("monthlyChart"), {
+    type:"bar",
+    data:{
+      labels:keys.map(key => key.slice(2).replace("-","/")),
+      datasets:[
+        {
+          label:"用电",
+          data:keys.map(key => analysis.months[key]?.usage || 0),
+          backgroundColor:"rgba(67,119,246,.82)",
+          borderRadius:6,
+          maxBarThickness:25
+        },
+        {
+          label:"充值",
+          data:keys.map(key => analysis.months[key]?.recharge || 0),
+          backgroundColor:"rgba(18,165,122,.72)",
+          borderRadius:6,
+          maxBarThickness:25
+        }
+      ]
+    },
+    options:monthlyOptions
+  });
+}
+
+function renderActivities(activities){
+  const container = $("activityList");
+  const items = activities.slice(-12).reverse();
+  if(!items.length){
+    container.innerHTML = '<div class="empty">积累两次不同余额后显示变动</div>';
+    return;
+  }
+
+  container.innerHTML = items.map(item => {
+    const recharge = item.type === "recharge";
+    return `<div class="activity ${recharge ? "recharge" : ""}">
+      <div class="activity-icon">${recharge ? "＋" : "↘"}</div>
+      <div>
+        <div class="activity-title">${recharge ? "余额充值" : "用电消耗"}</div>
+        <div class="activity-time">${cnTime(item.time)} · ${money(item.fromBalance)} → ${money(item.toBalance)} 元</div>
+      </div>
+      <div class="activity-amount">${recharge ? "+" : "−"}${money(item.amount)} 元</div>
+    </div>`;
+  }).join("");
+}
+
+function renderRecentRows(rows){
+  const tbody = $("recentBody");
+  const items = rows.slice(-10).reverse();
+  tbody.innerHTML = items.map((row,index) => {
+    const position = rows.length - 1 - index;
+    const previous = rows[position - 1];
+    const gap = previous
+      ? (new Date(row.created_at) - new Date(previous.created_at)) / 3600000
+      : null;
+    return `<tr>
+      <td>${cnTime(row.created_at,true)}</td>
+      <td>${row.id ?? "--"}</td>
+      <td>${gap == null ? "--" : `${gap.toFixed(1)} 小时`}</td>
+      <td>¥ ${money(row.balance)}</td>
+    </tr>`;
+  }).join("");
+  $("recordDesc").textContent = `已读取 ${rows.length} 条数据 · 显示最近 ${items.length} 条`;
+}
+
+function setStatus(text,type=""){
+  const status = $("status");
+  status.textContent = text;
+  status.className = `status ${type}`.trim();
+}
+
+function showNotice(message,type=""){
+  const notice = $("notice");
+  if(!message){
+    notice.className = "notice";
+    notice.textContent = "";
+    return;
+  }
+  notice.textContent = message;
+  notice.className = `notice show ${type}`.trim();
+}
+
+function showToast(message,isError=false){
+  const node = $("toast");
+  node.textContent = message;
+  node.className = `toast show${isError ? " error" : ""}`;
+  clearTimeout(showToast.timer);
+  showToast.timer = setTimeout(() => node.className = "toast", 3000);
+}
+
+function render(rows){
+  currentRows = rows;
+  currentAnalysis = analyze(rows);
+  const a = currentAnalysis;
+  const latest = rows.at(-1);
+  const latestAgeMinutes = Math.max(
+    0,
+    Math.floor((Date.now() - new Date(latest.created_at).getTime()) / 60000)
+  );
+
+  $("balance").textContent = money(latest.balance);
+  $("todayUsage").textContent = money(a.todayUsage);
+  $("monthUsage").textContent = money(a.monthUsage);
+  $("remainingDays").textContent = a.remainingDays == null
+    ? "--"
+    : a.remainingDays.toFixed(1);
+  $("yesterdayUsage").textContent = money(a.yesterdayUsage);
+  $("averageDaily").textContent = money(a.averageDaily);
+  $("monthRecharge").textContent = money(a.monthRecharge);
+  $("projectedMonth").textContent = money(a.projectedMonth);
+  $("balanceNote").textContent = `数据更新于 ${cnTime(latest.created_at,true)}`;
+  $("todayCompare").textContent = `昨日 ${money(a.yesterdayUsage)} 元`;
+  $("monthProjectionNote").textContent = `月末预计 ${money(a.projectedMonth)} 元`;
+  $("lastQuery").textContent = `网页刷新于 ${cnTime(new Date(),true)} · 共 ${rows.length} 条`;
+
+  if(latestAgeMinutes > 90){
+    setStatus("数据较旧","warning");
+  }else{
+    setStatus("数据正常");
+  }
+
+  if(latest.balance < LOW_BALANCE_THRESHOLD){
+    showNotice(`当前余额低于 ${LOW_BALANCE_THRESHOLD} 元，请及时充值。`);
+  }else if(a.longGapCount > 0){
+    showNotice(
+      `半年数据中存在 ${a.longGapCount} 个超过 ${NORMAL_GAP_HOURS} 小时的采集间隔。长间隔用电会按时间平均分摊，但不会计为完整采集覆盖。`
+    );
+  }else{
+    showNotice("");
+  }
+
+  renderCharts(rows,a);
+  renderActivities(a.activities);
+  renderRecentRows(rows);
+}
+
+async function refresh(showSuccess=false){
+  if(refreshing) return;
+  refreshing = true;
+  const button = $("refreshBtn");
+  button.disabled = true;
+  button.textContent = "读取中…";
+  setStatus("正在读取","loading");
+
+  try{
+    const rows = await loadData();
+    render(rows);
+    if(showSuccess) showToast(`刷新成功，当前余额 ${money(rows.at(-1).balance)} 元`);
+  }catch(error){
+    console.error(error);
+    setStatus("读取失败","error");
+    showNotice(error.message,"error");
+    if(showSuccess) showToast(error.message,true);
+  }finally{
+    refreshing = false;
+    button.disabled = false;
+    button.textContent = "刷新数据";
+  }
+}
+
+function exportCsv(){
+  if(!currentRows.length){
+    showToast("当前没有可导出的数据",true);
+    return;
+  }
+  const lines = [
+    ["id","created_at_utc","beijing_time","balance"],
+    ...currentRows.map(row => [
+      row.id ?? "",
+      row.created_at,
+      cnTime(row.created_at,true),
+      row.balance.toFixed(2)
+    ])
+  ];
+  const csv = "\uFEFF" + lines.map(
+    line => line.map(value => `"${String(value).replaceAll('"','""')}"`).join(",")
+  ).join("\r\n");
+  const blob = new Blob([csv],{type:"text/csv;charset=utf-8"});
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `electricity_${dayKey(new Date())}.csv`;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+$("refreshBtn").addEventListener("click",() => refresh(true));
+$("exportBtn").addEventListener("click",exportCsv);
+
+document.querySelectorAll(".tab").forEach(tab => {
+  tab.addEventListener("click",() => {
+    document.querySelectorAll(".tab").forEach(item => item.classList.remove("active"));
+    tab.classList.add("active");
+    dailyRange = Number(tab.dataset.days);
+    if(currentRows.length && currentAnalysis){
+      renderCharts(currentRows,currentAnalysis);
+    }
+  });
+});
+
+window.addEventListener("online",() => refresh(false));
+window.addEventListener("offline",() => {
+  setStatus("网络已断开","error");
+  showNotice("当前设备已离线，恢复网络后会自动重新读取。","error");
+});
+
+refresh(false);
+setInterval(() => refresh(false),AUTO_REFRESH_MS);
+</script>
+</body>
+</html>
