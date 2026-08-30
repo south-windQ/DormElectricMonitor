@@ -1,8 +1,8 @@
+import subprocess
 import json
 import os
 import time
-from urllib.request import Request, urlopen
-from urllib.error import HTTPError, URLError
+import urllib.request
 
 
 ROOM_ID = "9979"
@@ -19,28 +19,35 @@ def get_balance():
         f"meterAccount/electricity?roomId={ROOM_ID}&_={timestamp}"
     )
 
-    request = Request(
-        url,
-        headers={
-            "Accept": "application/json, text/plain, */*",
-            "User-Agent": "Mozilla/5.0 ElectricityMonitor/1.0",
-        },
+    result = subprocess.run(
+        [
+            "curl.exe",
+            "-s",
+            "--max-time",
+            "15",
+            url
+        ],
+        capture_output=True,
+        text=True,
+        encoding="utf-8"
     )
 
-    try:
-        with urlopen(request, timeout=15) as response:
-            raw = response.read().decode("utf-8")
-    except (HTTPError, URLError, TimeoutError) as exc:
-        raise RuntimeError(f"查询电费失败：{exc}") from exc
+    if result.returncode != 0:
+        raise RuntimeError(
+            f"curl 查询失败：{result.stderr}"
+        )
 
-    data = json.loads(raw)
+    if not result.stdout.strip():
+        raise RuntimeError("学校接口返回空内容")
+
+    data = json.loads(result.stdout)
 
     if data.get("code") not in (0, "0"):
-        raise RuntimeError(f"学校接口返回异常：{data}")
+        raise RuntimeError(
+            f"学校接口返回异常：{data}"
+        )
 
-    balance = float(data["data"])
-
-    return round(balance, 2)
+    return round(float(data["data"]), 2)
 
 
 def save_to_supabase(balance):
@@ -50,28 +57,40 @@ def save_to_supabase(balance):
         "balance": balance
     }).encode("utf-8")
 
-    request = Request(
+    request = urllib.request.Request(
         url,
         data=payload,
-        method="POST",
-        headers={
-            "apikey": SUPABASE_SERVICE_ROLE_KEY,
-            "Authorization": f"Bearer {SUPABASE_SERVICE_ROLE_KEY}",
-            "Content-Type": "application/json",
-            "Prefer": "return=minimal",
-        },
+        method="POST"
     )
 
-    try:
-        with urlopen(request, timeout=15) as response:
-            status = response.status
-    except HTTPError as exc:
-        body = exc.read().decode("utf-8", errors="replace")
-        raise RuntimeError(
-            f"Supabase 写入失败：HTTP {exc.code}，{body}"
-        ) from exc
+    request.add_header(
+        "apikey",
+        SUPABASE_SERVICE_ROLE_KEY
+    )
 
-    print(f"Supabase 状态码：{status}")
+    request.add_header(
+        "Authorization",
+        f"Bearer {SUPABASE_SERVICE_ROLE_KEY}"
+    )
+
+    request.add_header(
+        "Content-Type",
+        "application/json"
+    )
+
+    request.add_header(
+        "Prefer",
+        "return=minimal"
+    )
+
+    with urllib.request.urlopen(
+        request,
+        timeout=15
+    ) as response:
+
+        print(
+            f"Supabase 状态码：{response.status}"
+        )
 
 
 if __name__ == "__main__":
@@ -80,7 +99,9 @@ if __name__ == "__main__":
 
     balance = get_balance()
 
-    print(f"当前寝室电费：{balance:.2f} 元")
+    print(
+        f"当前寝室电费：{balance:.2f} 元"
+    )
 
     save_to_supabase(balance)
 
