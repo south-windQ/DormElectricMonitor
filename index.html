@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#111827" />
+  <title>寝室电费监控</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+  <style>
+    :root{
+      --bg:#f6f7fb; --card:#ffffff; --text:#111827; --muted:#6b7280;
+      --border:#e5e7eb; --shadow:0 10px 30px rgba(15,23,42,.07);
+      --radius:20px;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0; font-family:system-ui,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+      background:var(--bg); color:var(--text);
+    }
+    .wrap{max-width:1000px;margin:auto;padding:18px}
+    .top{
+      display:flex;align-items:center;justify-content:space-between;gap:16px;
+      margin:6px 0 18px
+    }
+    h1{font-size:24px;margin:0}
+    .sub{font-size:13px;color:var(--muted);margin-top:5px}
+    .status{font-size:13px;padding:8px 12px;border-radius:999px;background:#fff;border:1px solid var(--border)}
+    .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+    .card{
+      background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
+      box-shadow:var(--shadow);padding:18px
+    }
+    .label{font-size:13px;color:var(--muted);margin-bottom:8px}
+    .value{font-size:30px;font-weight:750;letter-spacing:-.5px}
+    .unit{font-size:14px;color:var(--muted);font-weight:500;margin-left:4px}
+    .panel{margin-top:14px}
+    .panel h2{font-size:16px;margin:0 0 4px}
+    .desc{font-size:12px;color:var(--muted);margin-bottom:12px}
+    .chartbox{height:300px}
+    .rows{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+    .recent{width:100%;border-collapse:collapse}
+    .recent th,.recent td{padding:10px 6px;border-bottom:1px solid var(--border);font-size:13px;text-align:left}
+    .recent th{color:var(--muted);font-weight:600}
+    .error{
+      display:none;margin-bottom:14px;padding:12px 14px;border-radius:14px;
+      border:1px solid #fecaca;background:#fef2f2;color:#991b1b;font-size:13px;white-space:pre-wrap
+    }
+    .footer{font-size:12px;color:var(--muted);text-align:center;margin:20px 0 8px}
+    @media(max-width:760px){
+      .wrap{padding:12px}
+      .top{align-items:flex-start}
+      h1{font-size:21px}
+      .grid{grid-template-columns:1fr 1fr;gap:10px}
+      .card{padding:15px;border-radius:17px}
+      .value{font-size:25px}
+      .rows{grid-template-columns:1fr}
+      .chartbox{height:260px}
+    }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div>
+      <h1>寝室电费监控</h1>
+      <div class="sub">数据每小时自动采集 · 时间按北京时间显示</div>
+    </div>
+    <div id="status" class="status">正在读取…</div>
+  </div>
+
+  <div id="errorBox" class="error"></div>
+
+  <section class="grid">
+    <div class="card"><div class="label">当前余额</div><div class="value" id="balance">--<span class="unit">元</span></div></div>
+    <div class="card"><div class="label">今日用电</div><div class="value" id="today">--<span class="unit">元</span></div></div>
+    <div class="card"><div class="label">本月用电</div><div class="value" id="month">--<span class="unit">元</span></div></div>
+    <div class="card"><div class="label">今日充值</div><div class="value" id="recharge">--<span class="unit">元</span></div></div>
+  </section>
+
+  <section class="card panel">
+    <h2>最近 72 小时余额</h2>
+    <div class="desc">余额下降代表用电；余额明显上升按充值处理</div>
+    <div class="chartbox"><canvas id="balanceChart"></canvas></div>
+  </section>
+
+  <section class="rows">
+    <div class="card panel">
+      <h2>近 7 天用电</h2>
+      <div class="desc">按北京时间自然日统计</div>
+      <div class="chartbox"><canvas id="dailyChart"></canvas></div>
+    </div>
+
+    <div class="card panel">
+      <h2>最近记录</h2>
+      <div class="desc">Supabase 原始采集数据</div>
+      <table class="recent">
+        <thead><tr><th>北京时间</th><th>余额</th></tr></thead>
+        <tbody id="recentBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="footer">Dorm Electricity Monitor · Supabase + GitHub Pages</div>
+</div>
+
+<script>
+/*
+  只填写公开的 Supabase Project URL 和 Publishable/anon key。
+  千万不要把 service_role / sb_secret_... 密钥放进这个网页。
+*/
+const SUPABASE_URL = "https://qqlvyohgxbmvbtxgvwxw.supabase.co";
+const SUPABASE_PUBLIC_KEY = "sb_publishable_paoG7O2340i2xo2igiLJbw_6ZZTY1UK";
+
+const TZ = "Asia/Shanghai";
+let balanceChart, dailyChart;
+
+function money(v){ return Number.isFinite(v) ? v.toFixed(2) : "--"; }
+
+function cnParts(value){
+  const parts = new Intl.DateTimeFormat("zh-CN", {
+    timeZone: TZ, year:"numeric", month:"2-digit", day:"2-digit",
+    hour:"2-digit", minute:"2-digit", second:"2-digit", hourCycle:"h23"
+  }).formatToParts(new Date(value));
+  const obj = {};
+  for(const p of parts) if(p.type !== "literal") obj[p.type] = p.value;
+  return obj;
+}
+function dayKey(value){
+  const p = cnParts(value);
+  return `${p.year}-${p.month}-${p.day}`;
+}
+function monthKey(value){ return dayKey(value).slice(0,7); }
+function cnTime(value){
+  return new Intl.DateTimeFormat("zh-CN", {
+    timeZone:TZ, month:"2-digit", day:"2-digit", hour:"2-digit", minute:"2-digit",
+    hourCycle:"h23"
+  }).format(new Date(value));
+}
+function todayKey(){
+  return dayKey(new Date());
+}
+
+function analyze(rows){
+  const byDay = {};
+  let todayRecharge = 0;
+
+  for(let i=1;i<rows.length;i++){
+    const prev = Number(rows[i-1].balance);
+    const cur = Number(rows[i].balance);
+    const diff = prev - cur; // 正数=消耗，负数=余额上升
+    const d = dayKey(rows[i].created_at);
+    if(!byDay[d]) byDay[d] = {usage:0,recharge:0};
+
+    if(diff >= 0){
+      byDay[d].usage += diff;
+    } else {
+      byDay[d].recharge += -diff;
+    }
+  }
+
+  const today = todayKey();
+  const currentMonth = today.slice(0,7);
+  let monthUsage = 0;
+  for(const [d,v] of Object.entries(byDay)){
+    if(d.startsWith(currentMonth)) monthUsage += v.usage;
+  }
+  todayRecharge = byDay[today]?.recharge || 0;
+
+  return {
+    byDay,
+    todayUsage: byDay[today]?.usage || 0,
+    monthUsage,
+    todayRecharge
+  };
+}
+
+async function loadData(){
+  const errorBox = document.getElementById("errorBox");
+  errorBox.style.display = "none";
+
+  if(SUPABASE_URL.startsWith("请替换") || SUPABASE_PUBLIC_KEY.startsWith("请替换")){
+    throw new Error("请先在 index.html 顶部填写 SUPABASE_URL 和 SUPABASE_PUBLIC_KEY。");
+  }
+
+  const url = `${SUPABASE_URL}/rest/v1/electricity?select=id,created_at,balance&order=created_at.asc&limit=1000`;
+  const res = await fetch(url, {
+    headers:{
+      "apikey": SUPABASE_PUBLIC_KEY,
+      "Authorization": `Bearer ${SUPABASE_PUBLIC_KEY}`
+    }
+  });
+
+  if(!res.ok){
+    const body = await res.text();
+    throw new Error(`Supabase读取失败：HTTP ${res.status}\n${body}`);
+  }
+
+  const rows = await res.json();
+  if(!rows.length) throw new Error("Supabase electricity 表里还没有数据。");
+  return rows;
+}
+
+function render(rows){
+  const latest = rows[rows.length-1];
+  const a = analyze(rows);
+
+  document.getElementById("balance").innerHTML = `${money(Number(latest.balance))}<span class="unit">元</span>`;
+  document.getElementById("today").innerHTML = `${money(a.todayUsage)}<span class="unit">元</span>`;
+  document.getElementById("month").innerHTML = `${money(a.monthUsage)}<span class="unit">元</span>`;
+  document.getElementById("recharge").innerHTML = `${money(a.todayRecharge)}<span class="unit">元</span>`;
+  document.getElementById("status").textContent = `更新于 ${cnTime(latest.created_at)}`;
+
+  const latestTs = new Date(latest.created_at).getTime();
+  const last72 = rows.filter(r => new Date(r.created_at).getTime() >= latestTs - 72*3600*1000);
+
+  if(balanceChart) balanceChart.destroy();
+  balanceChart = new Chart(document.getElementById("balanceChart"), {
+    type:"line",
+    data:{
+      labels:last72.map(r=>cnTime(r.created_at)),
+      datasets:[{
+        label:"余额（元）",
+        data:last72.map(r=>Number(r.balance)),
+        tension:.25,
+        pointRadius:last72.length > 80 ? 0 : 2
+      }]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      interaction:{mode:"index",intersect:false},
+      scales:{y:{beginAtZero:false}},
+      plugins:{legend:{display:false}}
+    }
+  });
+
+  const days = Object.keys(a.byDay).sort().slice(-7);
+  if(dailyChart) dailyChart.destroy();
+  dailyChart = new Chart(document.getElementById("dailyChart"), {
+    type:"bar",
+    data:{
+      labels:days.map(x=>x.slice(5)),
+      datasets:[{label:"用电（元）",data:days.map(d=>a.byDay[d].usage)}]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      scales:{y:{beginAtZero:true}},
+      plugins:{legend:{display:false}}
+    }
+  });
+
+  const tbody = document.getElementById("recentBody");
+  tbody.innerHTML = rows.slice(-8).reverse().map(r =>
+    `<tr><td>${cnTime(r.created_at)}</td><td>¥ ${money(Number(r.balance))}</td></tr>`
+  ).join("");
+}
+
+async function refresh(){
+  try{
+    document.getElementById("status").textContent = "正在读取…";
+    const rows = await loadData();
+    render(rows);
+  }catch(err){
+    document.getElementById("status").textContent = "读取失败";
+    const box = document.getElementById("errorBox");
+    box.textContent = err.message;
+    box.style.display = "block";
+  }
+}
+refresh();
+setInterval(refresh, 5*60*1000);
+</script>
+</body>
+</html>
