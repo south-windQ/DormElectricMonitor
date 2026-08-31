@@ -1,4 +1,4 @@
-<!dcd C:\Users\29782\Desktop\DormElectricMonitoroctype html>
+<!doctype html>
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
@@ -174,6 +174,30 @@
     }
     .toast.show{opacity:1;transform:translateY(0)}
     .toast.error{background:#862f39}
+
+    .modal{
+      position:fixed;inset:0;z-index:50;display:none;
+      align-items:center;justify-content:center;padding:18px;
+      background:rgba(23,32,51,.38);backdrop-filter:blur(4px);
+    }
+    .modal.show{display:flex}
+    .modal-card{
+      width:min(430px,100%);background:white;border-radius:20px;
+      border:1px solid var(--border);box-shadow:0 24px 70px rgba(23,32,51,.22);
+      padding:20px;
+    }
+    .modal-title{font-size:18px;font-weight:760;margin-bottom:6px}
+    .modal-desc{font-size:12px;color:var(--muted);line-height:1.6;margin-bottom:16px}
+    .field{margin-bottom:13px}
+    .field label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}
+    .field input{
+      width:100%;border:1px solid var(--border);border-radius:11px;
+      padding:11px 12px;font:inherit;color:var(--text);background:#fbfcfe;
+      outline:none;
+    }
+    .field input:focus{border-color:#aebff2;box-shadow:0 0 0 3px rgba(67,119,246,.10)}
+    .modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:17px}
+
     @media(max-width:940px){
       .hero{grid-template-columns:1fr 1fr}
       .layout{grid-template-columns:1fr}
@@ -266,7 +290,7 @@
       <div class="panel-head">
         <div>
           <h2>最近 72 小时余额</h2>
-          <div class="desc">余额下降代表用电，余额上升代表充值</div>
+          <div class="desc">发现余额上升时会询问实际充值金额，并据此校正用电</div>
         </div>
       </div>
       <div class="chartbox"><canvas id="balanceChart"></canvas></div>
@@ -276,7 +300,7 @@
       <div class="panel-head">
         <div>
           <h2>最近余额变动</h2>
-          <div class="desc">相同余额的定时采集不会重复显示</div>
+          <div class="desc">已确认充值会用于重新计算该区间真实用电</div>
         </div>
       </div>
       <div id="activityList" class="activity-list"></div>
@@ -327,11 +351,27 @@
   </section>
 
   <div class="footer">
-    统计说明：用电金额取相邻采集余额的下降值，余额上升会作为充值记录。
-    如果同一采集间隔内既充值又用电，仅凭余额无法精确拆分，充值所在区间的实际用电可能被低估。
-    网页只应使用 Supabase publishable/anon key，并确保 electricity 表已启用只读 RLS 策略。
+    统计说明：当检测到余额上升时，网页会询问该区间的实际充值金额。
+    校正后的用电 = 上次余额 + 实际充值金额 − 本次余额；充值统计使用你输入的实际金额。
+    人工确认仅保存在当前浏览器 localStorage，不会写入 Supabase。
   </div>
 </main>
+
+<div id="rechargeModal" class="modal" aria-hidden="true">
+  <div class="modal-card">
+    <div class="modal-title">发现可能充值</div>
+    <div id="rechargePrompt" class="modal-desc"></div>
+    <div class="field">
+      <label for="rechargeAmount">实际充值金额（元）</label>
+      <input id="rechargeAmount" type="number" min="0.01" max="10000" step="0.01" inputmode="decimal" placeholder="例如 50">
+    </div>
+    <div class="modal-actions">
+      <button id="skipRechargeBtn" class="btn" type="button">稍后确认</button>
+      <button id="saveRechargeBtn" class="btn primary" type="button">确认并重算</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast" class="toast"></div>
 
 <script>
@@ -354,6 +394,25 @@ let currentRows = [];
 let currentAnalysis = null;
 let dailyRange = 7;
 let refreshing = false;
+let pendingRechargeInterval = null;
+const RECHARGE_STORAGE_KEY = "dorm_electric_recharge_confirmations_v1";
+
+function loadRechargeConfirmations(){
+  try{
+    return JSON.parse(localStorage.getItem(RECHARGE_STORAGE_KEY) || "{}");
+  }catch{
+    return {};
+  }
+}
+
+function saveRechargeConfirmations(data){
+  localStorage.setItem(RECHARGE_STORAGE_KEY, JSON.stringify(data));
+}
+
+function intervalKey(previous,current){
+  return `${previous.id ?? previous.created_at}->${current.id ?? current.created_at}`;
+}
+
 
 const $ = id => document.getElementById(id);
 const money = value => Number.isFinite(Number(value)) ? Number(value).toFixed(2) : "--";
@@ -484,6 +543,8 @@ function analyze(rows){
   const activities = [];
   let longGapCount = 0;
   let rechargeIntervalCount = 0;
+  const confirmations = loadRechargeConfirmations();
+  const unconfirmedRecharges = [];
 
   for(let index = 1; index < rows.length; index++){
     const previous = rows[index - 1];
@@ -496,35 +557,88 @@ function analyze(rows){
     if(gapHours > NORMAL_GAP_HOURS) longGapCount++;
 
     if(gapHours <= NORMAL_GAP_HOURS){
-      for(const part of splitIntervalByDay(startMs, endMs, gapHours)){
-        ensureDay(byDay, part.key).coverageHours += part.value;
+      for(const part of splitIntervalByDay(startMs,endMs,gapHours)){
+        ensureDay(byDay,part.key).coverageHours += part.value;
       }
     }
 
-    const difference = previous.balance - current.balance;
-    if(Math.abs(difference) < BALANCE_EPSILON) continue;
+    const netChange = current.balance - previous.balance;
+    const key = intervalKey(previous,current);
 
-    if(difference > 0){
-      for(const part of splitIntervalByDay(startMs, endMs, difference)){
-        ensureDay(byDay, part.key).usage += part.value;
+    if(netChange > BALANCE_EPSILON){
+      const saved = confirmations[key];
+      if(saved && Number(saved.amount) > 0){
+        const rechargeAmount = Number(saved.amount);
+        const usage = Math.max(
+          0,
+          previous.balance + rechargeAmount - current.balance
+        );
+
+        const rechargeDay = dayKey(current.created_at);
+        ensureDay(byDay,rechargeDay).recharge += rechargeAmount;
+        rechargeIntervalCount++;
+
+        activities.push({
+          type:"recharge",
+          source:"confirmed",
+          time:current.created_at,
+          amount:rechargeAmount,
+          fromBalance:previous.balance,
+          toBalance:current.balance,
+          gapHours
+        });
+
+        if(usage > BALANCE_EPSILON){
+          for(const part of splitIntervalByDay(startMs,endMs,usage)){
+            ensureDay(byDay,part.key).usage += part.value;
+          }
+          activities.push({
+            type:"usage",
+            source:"adjusted",
+            time:current.created_at,
+            amount:usage,
+            fromBalance:previous.balance,
+            toBalance:current.balance,
+            rechargeAmount,
+            gapHours
+          });
+        }
+      }else{
+        // 未确认前，暂时按余额净增加额作为充值估计，但不把它算成“已确认充值”。
+        const inferred = netChange;
+        const rechargeDay = dayKey(current.created_at);
+        ensureDay(byDay,rechargeDay).recharge += inferred;
+
+        activities.push({
+          type:"recharge",
+          source:"unconfirmed",
+          time:current.created_at,
+          amount:inferred,
+          fromBalance:previous.balance,
+          toBalance:current.balance,
+          gapHours
+        });
+
+        unconfirmedRecharges.push({
+          key,
+          previous,
+          current,
+          inferred
+        });
+      }
+      continue;
+    }
+
+    const usage = previous.balance - current.balance;
+    if(usage > BALANCE_EPSILON){
+      for(const part of splitIntervalByDay(startMs,endMs,usage)){
+        ensureDay(byDay,part.key).usage += part.value;
       }
       activities.push({
         type:"usage",
+        source:"balance",
         time:current.created_at,
-        amount:difference,
-        fromBalance:previous.balance,
-        toBalance:current.balance,
-        gapHours
-      });
-    }else{
-      const key = dayKey(current.created_at);
-      const amount = -difference;
-      ensureDay(byDay, key).recharge += amount;
-      rechargeIntervalCount++;
-      activities.push({
-        type:"recharge",
-        time:current.created_at,
-        amount,
+        amount:usage,
         fromBalance:previous.balance,
         toBalance:current.balance,
         gapHours
@@ -541,34 +655,32 @@ function analyze(rows){
   }
 
   const today = dayKey(new Date());
-  const yesterday = addDaysToKey(today, -1);
+  const yesterday = addDaysToKey(today,-1);
   const currentMonth = today.slice(0,7);
-  const averageCandidates = lastDayKeys(21, yesterday)
+  const averageCandidates = lastDayKeys(21,yesterday)
     .map(key => ({key,...(byDay[key] || {usage:0,recharge:0,coverageHours:0})}))
     .filter(item => item.coverageHours >= 18)
     .slice(-7);
 
   const fallbackCandidates = averageCandidates.length
     ? averageCandidates
-    : lastDayKeys(7, yesterday)
+    : lastDayKeys(7,yesterday)
         .map(key => ({key,...(byDay[key] || {usage:0,recharge:0,coverageHours:0})}))
         .filter(item => item.coverageHours > 0);
 
   const averageDaily = fallbackCandidates.length
-    ? fallbackCandidates.reduce((sum,item) => sum + item.usage, 0) / fallbackCandidates.length
+    ? fallbackCandidates.reduce((sum,item) => sum + item.usage,0) / fallbackCandidates.length
     : 0;
 
   const latest = rows.at(-1);
-
-  // 月末预计 = 本月已经发生的实际用电 + 今天之后剩余自然日 × 最近有效日均。
-  // 这样不会用“日均 × 整月天数”覆盖掉本月已经采集到的真实数据。
   const currentMonthUsage = months[currentMonth]?.usage || 0;
   const todayOfMonth = Number(today.slice(-2));
   const remainingCalendarDays = Math.max(
     0,
     daysInMonth(currentMonth) - todayOfMonth
   );
-  const projectedMonth = currentMonthUsage + averageDaily * remainingCalendarDays;
+  const projectedMonth =
+    currentMonthUsage + averageDaily * remainingCalendarDays;
 
   const remainingDays = latest && averageDaily > BALANCE_EPSILON
     ? latest.balance / averageDaily
@@ -580,6 +692,7 @@ function analyze(rows){
     activities,
     longGapCount,
     rechargeIntervalCount,
+    unconfirmedRecharges,
     todayUsage:byDay[today]?.usage || 0,
     yesterdayUsage:byDay[yesterday]?.usage || 0,
     monthUsage:currentMonthUsage,
@@ -798,7 +911,11 @@ function renderActivities(activities){
     return `<div class="activity ${recharge ? "recharge" : ""}">
       <div class="activity-icon">${recharge ? "＋" : "↘"}</div>
       <div>
-        <div class="activity-title">${recharge ? "余额充值" : "用电消耗"}</div>
+        <div class="activity-title">${
+          recharge
+            ? (item.source === "confirmed" ? "已确认充值" : "待确认充值")
+            : (item.source === "adjusted" ? "校正后用电" : "用电消耗")
+        }</div>
         <div class="activity-time">${cnTime(item.time)} · ${money(item.fromBalance)} → ${money(item.toBalance)} 元</div>
       </div>
       <div class="activity-amount">${recharge ? "+" : "−"}${money(item.amount)} 元</div>
@@ -881,14 +998,22 @@ function render(rows){
     setStatus("数据正常");
   }
 
+  const notices = [];
   if(latest.balance < LOW_BALANCE_THRESHOLD){
-    showNotice(`当前余额低于 ${LOW_BALANCE_THRESHOLD} 元，请及时充值。`);
-  }else if(a.longGapCount > 0){
-    showNotice(
+    notices.push(`当前余额低于 ${LOW_BALANCE_THRESHOLD} 元，请及时充值。`);
+  }
+  if(a.unconfirmedRecharges.length > 0){
+    notices.push(`发现 ${a.unconfirmedRecharges.length} 个余额上升区间，等待确认实际充值金额。`);
+  }
+  if(a.longGapCount > 0){
+    notices.push(
       `半年数据中存在 ${a.longGapCount} 个超过 ${NORMAL_GAP_HOURS} 小时的采集间隔。长间隔用电会按时间平均分摊，但不会计为完整采集覆盖。`
     );
-  }else{
-    showNotice("");
+  }
+  showNotice(notices.join(" "));
+
+  if(a.unconfirmedRecharges.length > 0 && !$("rechargeModal").classList.contains("show")){
+    openRechargePrompt(a.unconfirmedRecharges[0]);
   }
 
   renderCharts(rows,a);
@@ -945,6 +1070,71 @@ function exportCsv(){
   link.click();
   URL.revokeObjectURL(url);
 }
+
+
+function openRechargePrompt(item){
+  pendingRechargeInterval = item;
+  $("rechargePrompt").textContent =
+    `检测到 ${cnTime(item.current.created_at,true)} 余额从 `
+    + `${money(item.previous.balance)} 元上升到 ${money(item.current.balance)} 元。`
+    + ` 余额净增加 ${money(item.inferred)} 元。请输入这次实际充值金额，`
+    + `系统将重新计算该区间真实用电。`;
+  $("rechargeAmount").value = "";
+  $("rechargeModal").classList.add("show");
+  $("rechargeModal").setAttribute("aria-hidden","false");
+  setTimeout(() => $("rechargeAmount").focus(),0);
+}
+
+function closeRechargePrompt(){
+  $("rechargeModal").classList.remove("show");
+  $("rechargeModal").setAttribute("aria-hidden","true");
+  pendingRechargeInterval = null;
+}
+
+function confirmRechargeAmount(){
+  if(!pendingRechargeInterval) return;
+  const amount = Number($("rechargeAmount").value);
+
+  if(!Number.isFinite(amount) || amount <= 0 || amount > 10000){
+    showToast("请输入正确的实际充值金额",true);
+    return;
+  }
+
+  const minimum = pendingRechargeInterval.current.balance
+    - pendingRechargeInterval.previous.balance;
+
+  if(amount + BALANCE_EPSILON < minimum){
+    showToast(
+      `充值金额不能小于余额净增加 ${money(minimum)} 元，否则无法解释当前余额。`,
+      true
+    );
+    return;
+  }
+
+  const confirmations = loadRechargeConfirmations();
+  confirmations[pendingRechargeInterval.key] = {
+    amount:Number(amount.toFixed(2)),
+    confirmed_at:new Date().toISOString()
+  };
+  saveRechargeConfirmations(confirmations);
+
+  const correctedUsage =
+    pendingRechargeInterval.previous.balance
+    + amount
+    - pendingRechargeInterval.current.balance;
+
+  closeRechargePrompt();
+  showToast(
+    `已确认充值 ${money(amount)} 元，校正该区间用电 ${money(correctedUsage)} 元`
+  );
+
+  if(currentRows.length){
+    render(currentRows);
+  }
+}
+
+$("saveRechargeBtn").addEventListener("click",confirmRechargeAmount);
+$("skipRechargeBtn").addEventListener("click",closeRechargePrompt);
 
 $("refreshBtn").addEventListener("click",() => refresh(true));
 $("exportBtn").addEventListener("click",exportCsv);
