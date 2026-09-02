@@ -585,29 +585,6 @@ button{outline:none}
   font-weight:800;
   color:var(--navy);
 }
-.table-wrap{
-  overflow:auto;
-  border-radius:14px;
-  border:1px solid #eef2f5;
-}
-table{
-  width:100%;
-  border-collapse:collapse;
-  font-size:13px;
-  background:#fff;
-}
-th,td{
-  padding:12px 11px;
-  text-align:left;
-  border-bottom:1px solid #eef2f5;
-  white-space:nowrap;
-}
-th{
-  color:#68727e;
-  font-weight:750;
-  background:#fbfcfd;
-}
-.raw-records{margin-top:0}
 
 .notice{display:none}
 .notice.show.error{
@@ -923,19 +900,6 @@ th{
         <div class="panel-head"><h2>近 6 个月统计</h2></div>
         <div class="chartbox"><canvas id="monthlyChart"></canvas></div>
       </article>
-    </section>
-
-    <section class="card panel raw-records">
-      <div class="panel-head">
-        <h2>最近采集记录</h2>
-        <span id="recordDesc" class="meta-pill">--</span>
-      </div>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>北京时间</th><th>记录 ID</th><th>与上次间隔</th><th>余额</th></tr></thead>
-          <tbody id="recentBody"></tbody>
-        </table>
-      </div>
     </section>
   </section>
 </div>
@@ -1527,24 +1491,6 @@ function renderActivities(activities){
   }).join("");
 }
 
-function renderRecentRows(rows){
-  const tbody = $("recentBody");
-  const items = rows.slice(-10).reverse();
-  tbody.innerHTML = items.map((row,index) => {
-    const position = rows.length - 1 - index;
-    const previous = rows[position - 1];
-    const gap = previous
-      ? (new Date(row.created_at) - new Date(previous.created_at)) / 3600000
-      : null;
-    return `<tr>
-      <td>${cnTime(row.created_at,true)}</td>
-      <td>${row.id ?? "--"}</td>
-      <td>${gap == null ? "--" : `${gap.toFixed(1)} 小时`}</td>
-      <td>¥ ${money(row.balance)}</td>
-    </tr>`;
-  }).join("");
-  $("recordDesc").textContent = `已读取 ${rows.length} 条数据 · 显示最近 ${items.length} 条`;
-}
 
 function setStatus(text,type=""){
   const status = $("status");
@@ -1796,7 +1742,6 @@ function render(rows){
   renderSchoolStyle(a,rows);
   renderCharts(rows,a);
   renderActivities(a.activities);
-  renderRecentRows(rows);
 }
 
 async function refresh(showSuccess=false){
