@@ -1,152 +1,253 @@
 <!doctype html>
 <html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#20aaa8"><title>寝室电费监控</title><script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script><style>
 :root{
-  --teal:#18aaa5;
-  --teal-dark:#108b87;
-  --bg:#f4f7f9;
+  --brand:#1fb6b2;
+  --brand-dark:#159892;
+  --brand-soft:#eaf9f8;
+  --navy:#172033;
+  --text:#263246;
+  --muted:#758091;
+  --line:#e7edf2;
+  --line-strong:#dce5eb;
   --card:#ffffff;
-  --text:#172033;
-  --muted:#6f7785;
-  --line:#e6ebef;
-  --red:#e84c5b;
-  --blue:#3978e8;
-  --shadow:0 10px 30px rgba(32,48,64,.06);
+  --bg:#f3f7fa;
+  --bg-2:#edf4f7;
+  --red:#e95667;
+  --red-soft:#fff1f3;
+  --blue:#4e7ff0;
+  --blue-soft:#eef4ff;
+  --green:#21a26f;
+  --green-soft:#ebfaf3;
+  --shadow-sm:0 8px 18px rgba(21, 33, 56, .05);
+  --shadow-md:0 14px 34px rgba(21, 33, 56, .07);
+  --shadow-lg:0 22px 46px rgba(21, 33, 56, .09);
+  --radius-xl:24px;
+  --radius-lg:18px;
+  --radius-md:14px;
+  --radius-sm:10px;
 }
 *{box-sizing:border-box}
 html{color-scheme:light}
 body{
   margin:0;
-  background:var(--bg);
+  min-height:100vh;
   color:var(--text);
   font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
   -webkit-font-smoothing:antialiased;
+  background:
+    radial-gradient(circle at top left, rgba(31,182,178,.10), transparent 30%),
+    radial-gradient(circle at top right, rgba(78,127,240,.08), transparent 26%),
+    linear-gradient(180deg, #f8fbfc 0%, var(--bg) 32%, var(--bg-2) 100%);
 }
 .hidden{display:none!important}
 button,input,select{font:inherit}
 button,select{cursor:pointer}
+button{outline:none}
 .app{
-  width:min(1680px,calc(100% - 48px));
+  width:min(1720px, calc(100% - 44px));
   margin:0 auto;
-  padding:24px 0 52px;
+  padding:26px 0 56px;
 }
+
 .appbar{
-  background:#fff;
-  padding:16px 20px;
-  border:1px solid var(--line);
-  border-radius:18px;
-  box-shadow:var(--shadow);
+  position:sticky;
+  top:14px;
+  z-index:20;
+  background:rgba(255,255,255,.86);
+  backdrop-filter:blur(12px);
+  -webkit-backdrop-filter:blur(12px);
+  padding:18px 22px;
+  border:1px solid rgba(231,237,242,.95);
+  border-radius:22px;
+  box-shadow:var(--shadow-md);
 }
-.appbar-row{display:flex;align-items:center;justify-content:space-between;gap:16px}
-.app-title{font-weight:800;font-size:20px;letter-spacing:.2px}
-.actions{display:flex;gap:8px}
+.appbar-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:18px;
+}
+.app-title{
+  font-size:24px;
+  font-weight:800;
+  color:var(--navy);
+  letter-spacing:.2px;
+}
+.actions{display:flex;gap:10px;flex-wrap:wrap}
 .btn{
-  border:1px solid #dce3e8;
+  border:1px solid var(--line-strong);
   background:#fff;
-  color:#263244;
-  border-radius:10px;
-  padding:8px 13px;
-  transition:.16s ease;
+  color:var(--text);
+  border-radius:12px;
+  padding:9px 15px;
+  font-weight:650;
+  transition:all .18s ease;
+  box-shadow:0 2px 0 rgba(0,0,0,.015);
 }
-.btn:hover{transform:translateY(-1px);border-color:#c8d3da}
-.btn.primary{background:var(--teal);border-color:var(--teal);color:#fff}
-.btn.primary:hover{background:var(--teal-dark)}
+.btn:hover{
+  transform:translateY(-1px);
+  box-shadow:var(--shadow-sm);
+  border-color:#cfd9e2;
+}
+.btn.primary{
+  background:linear-gradient(135deg, var(--brand) 0%, #2ac4b6 100%);
+  border-color:transparent;
+  color:#fff;
+}
+.btn.primary:hover{
+  background:linear-gradient(135deg, var(--brand-dark) 0%, #23b9ad 100%);
+}
 .status{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  margin-top:10px;
   font-size:12px;
-  padding:6px 10px;
+  line-height:1;
+  padding:7px 11px;
   border-radius:999px;
   background:#e9f8f6;
-  color:#117b72;
+  color:#137f79;
+  font-weight:700;
 }
-.status.warning{background:#fff2dc;color:#9e641e}
-.status.error{background:#ffebed;color:#bd3f4d}
-.status.loading{background:#eef3ff;color:#3569d9}
+.status.warning{background:#fff3de;color:#9d671f}
+.status.error{background:#ffeced;color:#bf4050}
+.status.loading{background:#eef3ff;color:#3c6ede}
 
 .school-hero{
+  position:relative;
+  overflow:hidden;
   margin-top:16px;
-  background:#fff;
+  padding:28px 28px 26px;
+  background:
+    radial-gradient(circle at 92% 12%, rgba(31,182,178,.14), transparent 16%),
+    radial-gradient(circle at 82% 34%, rgba(78,127,240,.10), transparent 18%),
+    linear-gradient(135deg, #ffffff 0%, #fbfefe 100%);
   border:1px solid var(--line);
-  border-radius:18px;
-  padding:22px 24px;
-  box-shadow:var(--shadow);
+  border-radius:var(--radius-xl);
+  box-shadow:var(--shadow-md);
 }
-.balance-row{display:flex;align-items:flex-end;justify-content:space-between;gap:18px}
-.balance-label{font-size:14px;color:var(--muted);margin-bottom:3px}
-.balance-big{font-size:44px;font-weight:800;letter-spacing:-1.2px;line-height:1.08}
-.balance-big small{font-size:16px;font-weight:600;color:var(--muted);margin-left:6px}
-.updated{font-size:13px;color:var(--muted);text-align:right}
+.school-hero:before{
+  content:"";
+  position:absolute;
+  inset:auto auto 0 0;
+  width:100%;
+  height:4px;
+  background:linear-gradient(90deg, var(--brand) 0%, #55d1c8 60%, #8ad6ff 100%);
+}
+.balance-row{
+  display:flex;
+  align-items:flex-end;
+  justify-content:space-between;
+  gap:20px;
+}
+.balance-label{
+  font-size:14px;
+  color:var(--muted);
+  margin-bottom:6px;
+}
+.balance-big{
+  font-size:52px;
+  line-height:1;
+  font-weight:850;
+  color:var(--navy);
+  letter-spacing:-1.6px;
+}
+.balance-big small{
+  font-size:18px;
+  font-weight:700;
+  color:#6a7483;
+  margin-left:8px;
+}
+.updated{
+  font-size:14px;
+  color:var(--muted);
+  text-align:right;
+}
 .low-balance-badge{
   display:inline-flex;
   align-items:center;
-  margin-top:12px;
-  padding:7px 10px;
-  border-radius:9px;
-  background:#ffedef;
-  color:#bd3947;
+  gap:7px;
+  margin-top:16px;
+  padding:8px 12px;
+  border-radius:999px;
+  background:var(--red-soft);
+  color:#be4151;
   font-size:13px;
-  font-weight:650;
+  font-weight:700;
+  border:1px solid #ffd6dc;
 }
 
 .main-tabs{
   display:grid;
   grid-template-columns:1fr 1fr;
-  margin-top:16px;
+  margin-top:18px;
   background:#fff;
   border:1px solid var(--line);
   border-bottom:0;
-  border-radius:18px 18px 0 0;
+  border-radius:22px 22px 0 0;
   overflow:hidden;
+  box-shadow:var(--shadow-sm);
 }
 .main-tabs button{
   border:0;
   background:#fff;
-  color:#3b4553;
-  padding:16px 10px;
-  font-size:18px;
-  font-weight:700;
+  color:#4f5a68;
+  padding:18px 10px 16px;
+  font-size:19px;
+  font-weight:800;
   position:relative;
-  transition:.16s ease;
+  transition:all .18s ease;
 }
-.main-tabs button:hover{background:#f8fbfb}
-.main-tabs button.active{color:var(--teal-dark)}
+.main-tabs button:hover{background:#f8fbfc}
+.main-tabs button.active{
+  color:var(--brand-dark);
+  background:linear-gradient(180deg, rgba(31,182,178,.06), rgba(31,182,178,0));
+}
 .main-tabs button.active:after{
   content:"";
   position:absolute;
-  left:22%;
-  right:22%;
+  left:18%;
+  right:18%;
   bottom:0;
-  height:3px;
-  background:var(--teal);
-  border-radius:3px;
+  height:4px;
+  border-radius:999px 999px 0 0;
+  background:linear-gradient(90deg, var(--brand) 0%, #59d1c6 100%);
 }
 
 .school-view{
   background:#fff;
   border:1px solid var(--line);
   border-top:0;
-  border-radius:0 0 18px 18px;
-  padding:22px 24px 26px;
-  box-shadow:var(--shadow);
+  border-radius:0 0 22px 22px;
+  padding:24px 26px 28px;
+  box-shadow:var(--shadow-md);
 }
 .picker-row{
   display:flex;
   align-items:center;
   justify-content:space-between;
   gap:16px;
-  margin-bottom:18px;
+  margin-bottom:20px;
 }
 .period-controls{display:flex;align-items:center;gap:10px}
 .period-select{
-  min-width:150px;
-  border:1px solid #dce3e8;
+  min-width:158px;
+  border:1px solid var(--line-strong);
   background:#fff;
-  color:#172033;
-  border-radius:10px;
-  padding:9px 34px 9px 12px;
-  font-size:17px;
-  font-weight:750;
+  color:var(--navy);
+  border-radius:12px;
+  padding:10px 36px 10px 14px;
+  font-size:16px;
+  font-weight:800;
   outline:none;
+  box-shadow:0 1px 0 rgba(0,0,0,.01);
 }
-.period-select:focus{border-color:var(--teal);box-shadow:0 0 0 3px rgba(24,170,165,.10)}
+.period-select:hover{border-color:#cfd8df}
+.period-select:focus{
+  border-color:var(--brand);
+  box-shadow:0 0 0 4px rgba(31,182,178,.10);
+}
 .unit-chip{
   display:inline-flex;
   align-items:center;
@@ -155,200 +256,539 @@ button,select{cursor:pointer}
   height:34px;
   padding:0 10px;
   border-radius:999px;
-  background:#f1f5f6;
+  background:#f3f7f8;
   color:#697482;
   font-size:12px;
-  font-weight:700;
+  font-weight:800;
+  border:1px solid #edf2f5;
 }
-.segmented{display:flex;background:#f1f3f5;border-radius:999px;padding:3px}
-.segmented button{
+.segmented,
+.tabs{
+  display:flex;
+  gap:4px;
+  padding:4px;
+  background:#f3f5f7;
+  border-radius:999px;
+  border:1px solid #ecf0f3;
+}
+.segmented button,
+.tab{
   border:0;
   background:transparent;
-  padding:8px 15px;
+  padding:8px 14px;
   border-radius:999px;
-  color:#5d6570;
-  transition:.15s ease;
-}
-.segmented button.active{background:var(--teal);color:#fff}
-
-.weekdays,.calendar-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px}
-.weekdays{
-  padding:13px 0 9px;
-  text-align:center;
-  color:#616a77;
+  color:#61707f;
   font-size:14px;
-  font-weight:650;
+  font-weight:700;
+  transition:all .16s ease;
+}
+.segmented button:hover,
+.tab:hover{background:rgba(255,255,255,.72)}
+.segmented button.active,
+.tab.active{
+  background:linear-gradient(135deg, var(--brand) 0%, #2dc6b7 100%);
+  color:#fff;
+  box-shadow:0 6px 14px rgba(31,182,178,.22);
+}
+
+.weekdays,.calendar-grid{
+  display:grid;
+  grid-template-columns:repeat(7,minmax(0,1fr));
+  gap:10px;
+}
+.weekdays{
+  padding:12px 0 10px;
+  text-align:center;
+  color:#606c7a;
+  font-size:14px;
+  font-weight:700;
   border-bottom:1px solid var(--line);
 }
-.calendar-grid{padding-top:10px}
+.calendar-grid{padding-top:12px}
 .cal-day{
-  min-height:82px;
-  border:1px solid transparent;
-  border-radius:12px;
+  min-height:96px;
+  border:1px solid #eef2f5;
+  background:linear-gradient(180deg, #fcfdfd 0%, #f8fafb 100%);
+  border-radius:16px;
   display:flex;
   flex-direction:column;
   align-items:center;
   justify-content:center;
-  gap:6px;
-  transition:.15s ease;
+  gap:8px;
+  transition:all .16s ease;
   user-select:none;
+  box-shadow:0 1px 0 rgba(0,0,0,.01);
 }
-.cal-day:hover{background:#f7fafb;border-color:#e9eef1;transform:translateY(-1px)}
-.cal-num{font-size:13px;color:#727b86}
-.cal-day b{font-size:16px;font-weight:700}
-.cal-day.max{background:#fff0f1;color:var(--red)}
-.cal-day.min{background:#eef3ff;color:var(--blue)}
-.cal-day.today{background:#e9f9f7;color:var(--teal-dark)}
-.calendar-legend{display:flex;gap:18px;flex-wrap:wrap;font-size:13px;color:#68727e;margin:18px 0}
-.legend-dot{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:6px;vertical-align:-1px}
-.legend-max{background:#f35c67}.legend-min{background:#3978e8}.legend-today{background:var(--teal)}
+.cal-day:hover{
+  transform:translateY(-2px);
+  box-shadow:var(--shadow-sm);
+  border-color:#dfe8ee;
+}
+.cal-num{
+  font-size:13px;
+  color:#7a8492;
+}
+.cal-day b{
+  font-size:18px;
+  font-weight:800;
+}
+.cal-day.max{
+  background:linear-gradient(180deg, #fff6f7 0%, #fff1f3 100%);
+  border-color:#ffdfe4;
+  color:var(--red);
+}
+.cal-day.min{
+  background:linear-gradient(180deg, #f5f8ff 0%, #eef4ff 100%);
+  border-color:#dbe6ff;
+  color:var(--blue);
+}
+.cal-day.today{
+  background:linear-gradient(180deg, #f2fcfb 0%, #eaf9f8 100%);
+  border-color:#d4f1ec;
+  color:var(--brand-dark);
+}
+.calendar-legend{
+  display:flex;
+  gap:18px;
+  flex-wrap:wrap;
+  font-size:13px;
+  color:#68727e;
+  margin:18px 0 10px;
+}
+.legend-dot{
+  display:inline-block;
+  width:11px;
+  height:11px;
+  border-radius:4px;
+  margin-right:6px;
+  vertical-align:-1px;
+}
+.legend-max{background:#ef5d69}
+.legend-min{background:#4e7ff0}
+.legend-today{background:var(--brand)}
+
 .month-summary{
   border-top:1px solid var(--line);
   display:grid;
   grid-template-columns:1fr 1fr;
-  gap:16px;
-  padding-top:18px;
+  gap:18px;
+  padding-top:20px;
+  margin-top:6px;
+}
+.summary-item{
+  padding:6px 2px;
 }
 .month-summary .summary-item:last-child{text-align:right}
-.summary-value{font-size:26px;font-weight:800}
-.summary-label{color:var(--muted);font-size:13px;margin-top:4px}
-.school-chart{height:390px;margin-top:8px}
+.summary-value{
+  font-size:34px;
+  font-weight:850;
+  color:var(--navy);
+  letter-spacing:-.8px;
+}
+.summary-label{
+  color:var(--muted);
+  font-size:14px;
+  margin-top:5px;
+}
 
-.year-toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px}
-.bill-list{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:20px}
-.bill-card{border:1px solid var(--line);border-radius:14px;padding:16px;background:#fff}
-.bill-month{font-weight:750;font-size:16px;margin-bottom:13px}
-.bill-values{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-.bill-values>div{display:flex;flex-direction:column}
-.bill-values b{font-size:24px}
-.bill-label{color:#78818e;font-size:13px;margin-top:3px}
+.school-chart{
+  height:400px;
+  margin-top:8px;
+  background:linear-gradient(180deg, #fcfdfd 0%, #fbfcfd 100%);
+  border:1px solid #eef2f5;
+  border-radius:18px;
+  padding:14px;
+}
+.year-toolbar{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:12px;
+  margin-bottom:16px;
+}
+.bill-list{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:14px;
+  margin-top:22px;
+}
+.bill-card{
+  position:relative;
+  overflow:hidden;
+  border:1px solid var(--line);
+  border-radius:18px;
+  padding:18px 18px 16px;
+  background:linear-gradient(180deg,#fff 0%,#fbfcfd 100%);
+  box-shadow:var(--shadow-sm);
+}
+.bill-card:before{
+  content:"";
+  position:absolute;
+  inset:0 auto auto 0;
+  width:100%;
+  height:4px;
+  background:linear-gradient(90deg, rgba(31,182,178,.95), rgba(87,208,197,.7));
+}
+.bill-month{
+  font-weight:800;
+  font-size:16px;
+  color:var(--navy);
+  margin-bottom:15px;
+}
+.bill-values{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:14px;
+}
+.bill-values>div{
+  display:flex;
+  flex-direction:column;
+}
+.bill-values b{
+  font-size:26px;
+  color:var(--navy);
+}
+.bill-label{
+  color:#7a8491;
+  font-size:13px;
+  margin-top:5px;
+}
 
-.details{padding:20px 0 0;display:grid;gap:14px}
-.details-title{font-size:18px;font-weight:800;margin:2px 2px 0}
-.overview-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
-.card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:17px;box-shadow:var(--shadow)}
-.overview-card .overview-label{color:var(--muted);font-size:13px}
-.overview-value{font-size:27px;font-weight:800;margin-top:8px}
-.overview-value span{font-size:13px;font-weight:600;color:var(--muted);margin-left:4px}
-.layout{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(360px,.65fr);gap:14px}
-.panel-head{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:4px}
-.panel h2{font-size:16px;margin:0}
-.meta-pill{font-size:12px;color:#697482;background:#f2f5f6;padding:5px 9px;border-radius:999px}
-.chartbox{height:300px}
-.activity-list{display:grid;gap:6px;max-height:300px;overflow:auto}
+.details{
+  padding:22px 0 0;
+  display:grid;
+  gap:16px;
+}
+.details-title{
+  font-size:22px;
+  font-weight:850;
+  color:var(--navy);
+  margin:2px 2px 0;
+}
+.overview-grid{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:14px;
+}
+.card{
+  background:linear-gradient(180deg, #ffffff 0%, #fbfcfd 100%);
+  border:1px solid var(--line);
+  border-radius:20px;
+  padding:18px;
+  box-shadow:var(--shadow-sm);
+}
+.overview-card{
+  position:relative;
+  overflow:hidden;
+}
+.overview-card:after{
+  content:"";
+  position:absolute;
+  right:-18px;
+  top:-18px;
+  width:84px;
+  height:84px;
+  border-radius:50%;
+  background:linear-gradient(135deg, rgba(31,182,178,.10), rgba(78,127,240,.04));
+}
+.overview-card .overview-label{
+  position:relative;
+  z-index:1;
+  color:var(--muted);
+  font-size:13px;
+}
+.overview-value{
+  position:relative;
+  z-index:1;
+  font-size:28px;
+  font-weight:850;
+  margin-top:10px;
+  color:var(--navy);
+}
+.overview-value span{
+  font-size:14px;
+  font-weight:700;
+  color:#728090;
+  margin-left:4px;
+}
+.layout{
+  display:grid;
+  grid-template-columns:minmax(0,1.35fr) minmax(380px,.65fr);
+  gap:16px;
+}
+.panel-head{
+  display:flex;
+  justify-content:space-between;
+  gap:12px;
+  align-items:center;
+  margin-bottom:10px;
+}
+.panel h2{
+  font-size:18px;
+  color:var(--navy);
+  margin:0;
+  font-weight:800;
+}
+.meta-pill{
+  font-size:12px;
+  color:#697482;
+  background:#f3f6f8;
+  padding:6px 10px;
+  border-radius:999px;
+  border:1px solid #eef2f5;
+}
+.chartbox{
+  height:320px;
+  padding-top:4px;
+}
+.activity-list{
+  display:grid;
+  gap:6px;
+  max-height:320px;
+  overflow:auto;
+  padding-right:2px;
+}
 .activity{
   display:grid;
-  grid-template-columns:32px 1fr auto;
-  gap:9px;
+  grid-template-columns:36px 1fr auto;
+  gap:10px;
   align-items:center;
-  padding:10px 0;
-  border-bottom:1px solid #f0f2f4;
+  padding:11px 0;
+  border-bottom:1px solid #eef2f5;
 }
 .activity:last-child{border-bottom:0}
-.activity-icon{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:#eef4ff;color:#3f6fe0}
-.activity.recharge .activity-icon{background:#eaf9f4;color:#11896f}
-.activity-title{font-size:13px;font-weight:650}
-.activity-time{font-size:11px;color:#9299a2;margin-top:3px}
-.activity-amount{font-weight:750}
-.table-wrap{overflow:auto}
-table{width:100%;border-collapse:collapse;font-size:13px}
-th,td{padding:11px 9px;text-align:left;border-bottom:1px solid #eef0f2;white-space:nowrap}
-th{color:#68727e;font-weight:650;background:#fbfcfd}
+.activity-icon{
+  width:34px;
+  height:34px;
+  border-radius:50%;
+  display:grid;
+  place-items:center;
+  background:var(--blue-soft);
+  color:#3d72e4;
+  font-size:14px;
+}
+.activity.recharge .activity-icon{
+  background:var(--green-soft);
+  color:var(--green);
+}
+.activity-title{
+  font-size:13px;
+  font-weight:750;
+  color:var(--navy);
+}
+.activity-time{
+  font-size:11px;
+  color:#9299a2;
+  margin-top:3px;
+}
+.activity-amount{
+  font-weight:800;
+  color:var(--navy);
+}
+.table-wrap{
+  overflow:auto;
+  border-radius:14px;
+  border:1px solid #eef2f5;
+}
+table{
+  width:100%;
+  border-collapse:collapse;
+  font-size:13px;
+  background:#fff;
+}
+th,td{
+  padding:12px 11px;
+  text-align:left;
+  border-bottom:1px solid #eef2f5;
+  white-space:nowrap;
+}
+th{
+  color:#68727e;
+  font-weight:750;
+  background:#fbfcfd;
+}
 .raw-records{margin-top:0}
 
 .notice{display:none}
 .notice.show.error{
   display:block;
   margin:12px 0 0;
-  padding:10px 12px;
-  border-radius:10px;
+  padding:11px 14px;
+  border-radius:12px;
   background:#ffeded;
   color:#bd3947;
   font-size:13px;
+  border:1px solid #ffd8dd;
 }
 
 .modal{
   position:fixed;
   inset:0;
-  background:rgba(0,0,0,.42);
+  background:rgba(11,18,32,.42);
   display:none;
   align-items:flex-end;
   justify-content:center;
-  z-index:30
+  z-index:30;
 }
 .modal.show{display:flex}
-.modal-card{width:min(100%,560px);background:#fff;border-radius:24px 24px 0 0;padding:22px}
-.modal-title{font-weight:800;font-size:20px}
-.modal-desc{color:#666;line-height:1.7;margin:9px 0 14px}
-.field label{display:block;font-size:13px;color:#666;margin-bottom:6px}
-.field input{width:100%;border:1px solid #dfe4e8;border-radius:10px;padding:12px}
-.modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
+.modal-card{
+  width:min(100%,560px);
+  background:#fff;
+  border-radius:28px 28px 0 0;
+  padding:24px 22px;
+  box-shadow:var(--shadow-lg);
+}
+.modal-title{
+  font-weight:850;
+  font-size:20px;
+  color:var(--navy);
+}
+.modal-desc{
+  color:#677281;
+  line-height:1.7;
+  margin:9px 0 14px;
+}
+.field label{
+  display:block;
+  font-size:13px;
+  color:#68727e;
+  margin-bottom:6px;
+}
+.field input{
+  width:100%;
+  border:1px solid #dfe6eb;
+  border-radius:12px;
+  padding:12px 13px;
+  outline:none;
+}
+.field input:focus{
+  border-color:var(--brand);
+  box-shadow:0 0 0 4px rgba(31,182,178,.10);
+}
+.modal-actions{
+  display:flex;
+  justify-content:flex-end;
+  gap:8px;
+  margin-top:14px;
+}
 .toast{
   position:fixed;
   left:50%;
   bottom:22px;
   transform:translateX(-50%) translateY(12px);
-  background:#20242a;
+  background:#1d2430;
   color:#fff;
-  padding:10px 14px;
-  border-radius:10px;
+  padding:11px 15px;
+  border-radius:12px;
+  box-shadow:var(--shadow-lg);
   opacity:0;
   pointer-events:none;
   transition:.2s;
-  z-index:50
+  z-index:50;
 }
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 .toast.error{background:#be3d49}
-.empty{padding:25px;text-align:center;color:#8d96a1}
+.empty{
+  padding:26px;
+  text-align:center;
+  color:#8d96a1;
+}
 
-@media(max-width:1100px){
+@media(max-width:1200px){
   .app{width:calc(100% - 28px)}
   .overview-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
   .layout{grid-template-columns:1fr}
   .bill-list{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
-@media(max-width:720px){
-  .app{width:100%;padding:0 0 28px}
-  .appbar{position:sticky;top:0;z-index:20;border-radius:0;border-left:0;border-right:0;padding:13px 14px}
-  .app-title{font-size:18px}
-  .school-hero{margin-top:0;border-radius:0;border-left:0;border-right:0;padding:18px 15px}
-  .balance-big{font-size:38px}
-  .updated{font-size:12px}
-  .main-tabs{margin-top:10px;border-radius:0;border-left:0;border-right:0}
-  .main-tabs button{font-size:16px;padding:14px 8px}
-  .school-view{border-radius:0;border-left:0;border-right:0;padding:16px 14px 20px}
-  .picker-row{align-items:flex-start}
-  .period-controls{align-items:flex-start}
-  .period-select{min-width:132px;font-size:15px;padding:8px 28px 8px 10px}
-  .segmented button{padding:7px 12px;font-size:13px}
-  .cal-day{min-height:60px;border-radius:8px}
-  .cal-day b{font-size:14px}
-  .calendar-legend{font-size:12px;gap:12px}
-  .school-chart{height:300px}
-  .details{padding:14px}
-  .overview-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
-  .overview-value{font-size:24px}
+@media(max-width:760px){
+  .app{
+    width:100%;
+    padding:0 0 28px;
+  }
+  .appbar{
+    top:0;
+    border-radius:0 0 18px 18px;
+    border-left:0;
+    border-right:0;
+    padding:14px 14px 13px;
+  }
+  .app-title{font-size:19px}
+  .school-hero{
+    margin-top:0;
+    border-radius:0;
+    border-left:0;
+    border-right:0;
+    padding:20px 14px 18px;
+  }
+  .balance-row{
+    flex-direction:column;
+    align-items:flex-start;
+  }
+  .balance-big{font-size:40px}
+  .updated{text-align:left;font-size:12px}
+  .main-tabs{
+    margin-top:10px;
+    border-radius:0;
+    border-left:0;
+    border-right:0;
+  }
+  .main-tabs button{
+    font-size:16px;
+    padding:15px 8px 13px;
+  }
+  .school-view{
+    border-radius:0;
+    border-left:0;
+    border-right:0;
+    padding:16px 14px 22px;
+  }
+  .picker-row{
+    align-items:flex-start;
+    flex-direction:column;
+  }
+  .period-select{
+    min-width:138px;
+    font-size:15px;
+  }
+  .unit-chip{display:none}
+  .weekdays,.calendar-grid{gap:6px}
+  .cal-day{
+    min-height:66px;
+    border-radius:12px;
+    gap:5px;
+  }
+  .cal-day b{font-size:15px}
+  .month-summary{
+    gap:10px;
+  }
+  .summary-value{font-size:24px}
+  .school-chart{
+    height:315px;
+    padding:8px;
+    border-radius:16px;
+  }
+  .details{
+    padding:14px;
+  }
+  .details-title{font-size:18px}
+  .overview-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .overview-value{font-size:23px}
   .bill-list{grid-template-columns:1fr}
-  .chartbox{height:260px}
+  .chartbox{height:270px}
 }
 @media(max-width:430px){
-  .actions .btn{padding:7px 10px}
-  .balance-row{align-items:flex-start;flex-direction:column}
-  .updated{text-align:left}
-  .picker-row{gap:10px}
-  .period-controls{gap:6px}
-  .unit-chip{display:none}
-  .segmented{margin-left:auto}
-  .segmented button{padding:7px 10px}
-  .weekdays,.calendar-grid{gap:4px}
-  .cal-day{min-height:56px}
+  .actions{gap:8px}
+  .btn{padding:8px 12px}
+  .segmented button,
+  .tab{
+    padding:7px 11px;
+    font-size:13px;
+  }
+  .weekdays{font-size:13px}
+  .calendar-legend{font-size:12px;gap:12px}
+  .card{padding:15px}
   .overview-grid{grid-template-columns:1fr 1fr;gap:8px}
-  .card{padding:14px}
-  .overview-value{font-size:22px}
-  .month-summary{gap:10px}
-  .summary-value{font-size:22px}
-  .school-chart{height:270px}
-  .activity{grid-template-columns:30px 1fr auto}
+  .bill-values b{font-size:23px}
 }
 </style></head><body>
 
@@ -388,7 +828,7 @@ th{color:#68727e;font-weight:650;background:#fbfcfd}
     <div class="picker-row">
       <div class="period-controls">
         <select id="monthPicker" class="period-select" aria-label="选择月份"></select>
-        <span class="unit-chip">kWh</span>
+        <span class="unit-chip">元</span>
       </div>
       <div class="segmented">
         <button id="calendarModeBtn" class="active" type="button">用电日历</button>
@@ -414,12 +854,12 @@ th{color:#68727e;font-weight:650;background:#fbfcfd}
 
     <div class="month-summary">
       <div class="summary-item">
-        <div id="selectedMonthTotalKwh" class="summary-value">--</div>
-        <div class="summary-label">累计电量（kWh）</div>
+        <div id="selectedMonthUsageYuan" class="summary-value">--</div>
+        <div class="summary-label">累计用电（元）</div>
       </div>
       <div class="summary-item">
-        <div id="selectedMonthTotalYuan" class="summary-value">--</div>
-        <div class="summary-label">累计电费（元）</div>
+        <div id="selectedMonthAverageYuan" class="summary-value">--</div>
+        <div class="summary-label">日均用电（元/天）</div>
       </div>
     </div>
   </section>
@@ -427,7 +867,7 @@ th{color:#68727e;font-weight:650;background:#fbfcfd}
   <section id="monthlyView" class="school-view hidden">
     <div class="year-toolbar">
       <select id="yearPicker" class="period-select" aria-label="选择年份"></select>
-      <span class="unit-chip">kWh</span>
+      <span class="unit-chip">元</span>
     </div>
     <div class="school-chart"><canvas id="schoolYearChart"></canvas></div>
     <div id="monthBillList" class="bill-list"></div>
@@ -467,6 +907,24 @@ th{color:#68727e;font-weight:650;background:#fbfcfd}
       </article>
     </section>
 
+    <section class="layout">
+      <article class="card panel">
+        <div class="panel-head">
+          <h2>每日用电</h2>
+          <div class="tabs">
+            <button class="tab active" data-days="7" type="button">近 7 天</button>
+            <button class="tab" data-days="30" type="button">近 30 天</button>
+          </div>
+        </div>
+        <div class="chartbox"><canvas id="dailyChart"></canvas></div>
+      </article>
+
+      <article class="card panel">
+        <div class="panel-head"><h2>近 6 个月统计</h2></div>
+        <div class="chartbox"><canvas id="monthlyChart"></canvas></div>
+      </article>
+    </section>
+
     <section class="card panel raw-records">
       <div class="panel-head">
         <h2>最近采集记录</h2>
@@ -492,13 +950,15 @@ const TZ = "Asia/Shanghai";
 const CHINA_OFFSET = "+08:00";
 const PAGE_SIZE = 1000;
 const MAX_PAGES = 10;
-const ELECTRICITY_PRICE = 0.558; // 元/千瓦时：按你截图中 133.36 元 / 239 kWh 估算，可自行修改
 const LOW_BALANCE_THRESHOLD = 1;
 const BALANCE_EPSILON = 0.005;
 const NORMAL_GAP_HOURS = 2.5;
 const AUTO_REFRESH_MS = 5 * 60 * 1000;
 
 let balanceChart;
+let dailyChart;
+let monthlyChart;
+let dailyRange = 7;
 let currentRows = [];
 let currentAnalysis = null;
 let refreshing = false;
@@ -524,7 +984,6 @@ function intervalKey(previous,current){
 
 const $ = id => document.getElementById(id);
 const money = value => Number.isFinite(Number(value)) ? Number(value).toFixed(2) : "--";
-const kwh = value => Number.isFinite(Number(value)) ? (Number(value) / ELECTRICITY_PRICE).toFixed(2) : "--";
 
 function chinaParts(value){
   const parts = new Intl.DateTimeFormat("zh-CN", {
@@ -926,38 +1385,121 @@ function renderCharts(rows, analysis){
     throw new Error("Chart.js 加载失败，请检查网络是否能访问 jsDelivr。");
   }
 
-  const canvas = $("balanceChart");
-  if(!canvas) return;
+  // --------------------------------------------------------
+  // 最近 72 小时余额
+  // --------------------------------------------------------
+  const balanceCanvas = $("balanceChart");
+  if(balanceCanvas){
+    const latestMs = new Date(rows.at(-1).created_at).getTime();
+    const balanceRows = rows.filter(
+      row => new Date(row.created_at).getTime() >= latestMs - 72 * 3600000
+    );
 
-  const latestMs = new Date(rows.at(-1).created_at).getTime();
-  const balanceRows = rows.filter(
-    row => new Date(row.created_at).getTime() >= latestMs - 72 * 3600000
-  );
+    balanceChart?.destroy();
 
-  balanceChart?.destroy();
-  const balanceOptions = chartBaseOptions();
-  balanceOptions.scales.y.beginAtZero = false;
-  balanceOptions.plugins.tooltip.callbacks = {
-    label:context => `余额 ${money(context.raw)} 元`
-  };
+    const balanceOptions = chartBaseOptions();
+    balanceOptions.scales.y.beginAtZero = false;
+    balanceOptions.plugins.tooltip.callbacks = {
+      label:context => `余额 ${money(context.raw)} 元`
+    };
 
-  balanceChart = new Chart(canvas,{
-    type:"line",
-    data:{
-      labels:balanceRows.map(row => cnTime(row.created_at)),
-      datasets:[{
-        data:balanceRows.map(row => row.balance),
-        borderColor:"#3978e8",
-        backgroundColor:"rgba(57,120,232,.10)",
-        borderWidth:2.2,
-        tension:.28,
-        fill:true,
-        pointRadius:balanceRows.length > 80 ? 0 : 2,
-        pointHoverRadius:4
-      }]
-    },
-    options:balanceOptions
-  });
+    balanceChart = new Chart(balanceCanvas,{
+      type:"line",
+      data:{
+        labels:balanceRows.map(row => cnTime(row.created_at)),
+        datasets:[{
+          data:balanceRows.map(row => row.balance),
+          borderColor:"#3978e8",
+          backgroundColor:"rgba(57,120,232,.10)",
+          borderWidth:2.2,
+          tension:.28,
+          fill:true,
+          pointRadius:balanceRows.length > 80 ? 0 : 2,
+          pointHoverRadius:4
+        }]
+      },
+      options:balanceOptions
+    });
+  }
+
+  // --------------------------------------------------------
+  // 每日用电：近 7 天 / 近 30 天，单位均为元
+  // --------------------------------------------------------
+  const dailyCanvas = $("dailyChart");
+  if(dailyCanvas){
+    const keys = lastDayKeys(dailyRange);
+    const values = keys.map(key => analysis.byDay[key]?.usage || 0);
+
+    dailyChart?.destroy();
+
+    const dailyOptions = chartBaseOptions();
+    dailyOptions.plugins.tooltip.callbacks = {
+      label:context => `用电 ${money(context.raw)} 元`
+    };
+
+    dailyChart = new Chart(dailyCanvas,{
+      type:"bar",
+      data:{
+        labels:keys.map(key => key.slice(5).replace("-","/")),
+        datasets:[{
+          data:values,
+          borderRadius:7,
+          maxBarThickness:42
+        }]
+      },
+      options:dailyOptions
+    });
+  }
+
+  // --------------------------------------------------------
+  // 近 6 个月：用电金额 + 充值金额
+  // --------------------------------------------------------
+  const monthlyCanvas = $("monthlyChart");
+  if(monthlyCanvas){
+    const keys = monthKeys(6);
+
+    monthlyChart?.destroy();
+
+    const monthlyOptions = chartBaseOptions();
+    monthlyOptions.plugins.legend = {
+      display:true,
+      position:"bottom",
+      labels:{
+        usePointStyle:true,
+        pointStyle:"circle",
+        boxWidth:8,
+        boxHeight:8,
+        padding:16,
+        color:"#68727e"
+      }
+    };
+    monthlyOptions.plugins.tooltip.callbacks = {
+      label:context =>
+        `${context.dataset.label} ${money(context.raw)} 元`
+    };
+
+    monthlyChart = new Chart(monthlyCanvas,{
+      type:"bar",
+      data:{
+        labels:keys.map(key => key.slice(2).replace("-","/")),
+        datasets:[
+          {
+            label:"用电",
+            data:keys.map(key => analysis.months[key]?.usage || 0),
+            borderRadius:6,
+            maxBarThickness:34
+          },
+          {
+            label:"充值",
+            data:keys.map(key => analysis.months[key]?.recharge || 0),
+            borderRadius:6,
+            maxBarThickness:34
+          }
+        ]
+      },
+      options:monthlyOptions
+    });
+  }
 }
 
 function renderActivities(activities){
@@ -1072,7 +1614,7 @@ function renderUsageCalendar(analysis, month){
     const cls = ["cal-day",isMax?"max":"",isMin?"min":"",isToday?"today":""].filter(Boolean).join(" ");
     return `<button type="button" class="${cls}" data-day="${v.key}" data-usage="${v.usage}" title="${v.key} · ${money(v.usage)} 元">
       <span class="cal-num">${v.d}</span>
-      <b>${v.usage > BALANCE_EPSILON ? kwh(v.usage) : ""}</b>
+      <b>${v.usage > BALANCE_EPSILON ? money(v.usage) : ""}</b>
     </button>`;
   }).join("");
   grid.innerHTML = blanks + cells;
@@ -1080,13 +1622,18 @@ function renderUsageCalendar(analysis, month){
   grid.querySelectorAll(".cal-day").forEach(cell=>{
     cell.addEventListener("click",()=>{
       const yuan = Number(cell.dataset.usage || 0);
-      showToast(`${cell.dataset.day} · ${kwh(yuan)} kWh · ${money(yuan)} 元`);
+      showToast(`${cell.dataset.day} · 用电 ${money(yuan)} 元`);
     });
   });
 
   const totalYuan = analysis.months[month]?.usage || 0;
-  $("selectedMonthTotalKwh").textContent = kwh(totalYuan);
-  $("selectedMonthTotalYuan").textContent = money(totalYuan);
+  const usedDays = values.filter(v => v.usage > BALANCE_EPSILON);
+  const averageYuan = usedDays.length
+    ? usedDays.reduce((sum,v)=>sum + v.usage,0) / usedDays.length
+    : 0;
+
+  $("selectedMonthUsageYuan").textContent = money(totalYuan);
+  $("selectedMonthAverageYuan").textContent = money(averageYuan);
 }
 
 function renderDailyMonthTrend(analysis, month){
@@ -1100,7 +1647,7 @@ function renderDailyMonthTrend(analysis, month){
     data:{
       labels:keys.map(k=>k.slice(5).replace("-","/")),
       datasets:[{
-        data:keys.map(k=>(analysis.byDay[k]?.usage || 0)/ELECTRICITY_PRICE),
+        data:keys.map(k=>analysis.byDay[k]?.usage || 0),
         borderColor:"#20aaa8",
         backgroundColor:"rgba(32,170,168,.10)",
         fill:true,
@@ -1112,7 +1659,7 @@ function renderDailyMonthTrend(analysis, month){
     },
     options:{
       responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${Number(c.raw).toFixed(2)} kWh`}}},
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${money(c.raw)} 元`}}},
       scales:{
         x:{grid:{display:false},ticks:{maxTicksLimit:9,color:"#81868f"}},
         y:{beginAtZero:true,grid:{color:"rgba(24,33,43,.09)"},ticks:{color:"#81868f"}}
@@ -1131,7 +1678,7 @@ function renderYearPanel(analysis, year){
       data:{
         labels:monthKeysForYear.map((_,i)=>`${i+1}月`),
         datasets:[{
-          data:monthKeysForYear.map(k=>(analysis.months[k]?.usage || 0)/ELECTRICITY_PRICE),
+          data:monthKeysForYear.map(k=>analysis.months[k]?.usage || 0),
           backgroundColor:"rgba(28,193,165,.90)",
           hoverBackgroundColor:"#19aa9f",
           borderRadius:2,
@@ -1140,7 +1687,7 @@ function renderYearPanel(analysis, year){
       },
       options:{
         responsive:true,maintainAspectRatio:false,
-        plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${Number(c.raw).toFixed(2)} kWh`}}},
+        plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${money(c.raw)} 元`}}},
         scales:{
           x:{grid:{display:false},ticks:{color:"#555"}},
           y:{beginAtZero:true,grid:{color:"rgba(24,33,43,.12)"},ticks:{color:"#666"}}
@@ -1156,8 +1703,8 @@ function renderYearPanel(analysis, year){
       return `<div class="bill-card">
         <div class="bill-month">${monthLabel(k)}</div>
         <div class="bill-values">
-          <div><b>${money(yuan)}</b><span class="bill-label">电费（元）</span></div>
-          <div><b>${kwh(yuan)}</b><span class="bill-label">电量（kWh）</span></div>
+          <div><b>${money(yuan)}</b><span class="bill-label">用电（元）</span></div>
+          <div><b>${money(analysis.months[k]?.recharge || 0)}</b><span class="bill-label">充值（元）</span></div>
         </div>
       </div>`;
     }).join("") : '<div class="empty">该年份暂无采集数据</div>';
@@ -1412,6 +1959,18 @@ $("yearPicker").addEventListener("change",event=>{
   if(currentAnalysis){
     renderYearPanel(currentAnalysis,selectedUsageYear);
   }
+});
+
+document.querySelectorAll(".tab[data-days]").forEach(button=>{
+  button.addEventListener("click",()=>{
+    dailyRange = Number(button.dataset.days);
+    document.querySelectorAll(".tab[data-days]").forEach(
+      item => item.classList.toggle("active", item === button)
+    );
+    if(currentAnalysis){
+      renderCharts(currentRows,currentAnalysis);
+    }
+  });
 });
 
 window.addEventListener("online",() => refresh(false));
