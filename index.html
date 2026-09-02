@@ -135,6 +135,53 @@ button{outline:none}
   height:4px;
   background:linear-gradient(90deg, var(--brand) 0%, #55d1c8 60%, #8ad6ff 100%);
 }
+
+.room-switch-row{
+  display:flex;
+  align-items:flex-end;
+  justify-content:space-between;
+  gap:18px;
+  padding-bottom:20px;
+  margin-bottom:22px;
+  border-bottom:1px solid var(--line);
+}
+.room-switch-main{min-width:0}
+.room-switch-label{
+  color:var(--muted);
+  font-size:13px;
+  font-weight:700;
+  margin-bottom:7px;
+}
+.room-select{
+  width:min(420px, 72vw);
+  border:1px solid var(--line-strong);
+  border-radius:13px;
+  background:#fff;
+  color:var(--navy);
+  padding:11px 40px 11px 14px;
+  font-size:16px;
+  font-weight:800;
+  outline:none;
+  box-shadow:0 2px 8px rgba(21,33,56,.03);
+}
+.room-select:hover{border-color:#cbd7df}
+.room-select:focus{
+  border-color:var(--brand);
+  box-shadow:0 0 0 4px rgba(31,182,178,.10);
+}
+.room-id-badge{
+  flex:0 0 auto;
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  padding:8px 11px;
+  border-radius:999px;
+  background:#f3f7f8;
+  color:#6d7887;
+  font-size:12px;
+  font-weight:700;
+  border:1px solid #edf1f4;
+}
 .balance-row{
   display:flex;
   align-items:flex-end;
@@ -697,6 +744,17 @@ button{outline:none}
     border-right:0;
     padding:20px 14px 18px;
   }
+  .room-switch-row{
+    align-items:flex-start;
+    flex-direction:column;
+    gap:10px;
+    padding-bottom:16px;
+    margin-bottom:18px;
+  }
+  .room-select{
+    width:min(100%, 420px);
+    font-size:15px;
+  }
   .balance-row{
     flex-direction:column;
     align-items:flex-start;
@@ -784,6 +842,14 @@ button{outline:none}
   </header>
 
   <section class="school-hero">
+    <div class="room-switch-row">
+      <div class="room-switch-main">
+        <div class="room-switch-label">当前寝室</div>
+        <select id="roomPicker" class="room-select" aria-label="选择寝室"></select>
+      </div>
+      <div class="room-id-badge">Room ID：<span id="currentRoomIdText">9979</span></div>
+    </div>
+
     <div class="balance-row">
       <div>
         <div class="balance-label">当前余额</div>
@@ -910,6 +976,25 @@ button{outline:none}
 const SUPABASE_URL = "https://qqlvyohgxbmvbtxgvwxw.supabase.co";
 const SUPABASE_PUBLIC_KEY = "sb_publishable_paoG7O2340i2xo2igiLJbw_6ZZTY1UK";
 
+const ROOMS = [
+  {id:"9979", name:"LJH(B1 0680203)", emailAlert:true},
+  {id:"9468", name:"ZYW(B1 0370202)", emailAlert:false}
+];
+
+const SELECTED_ROOM_STORAGE_KEY = "dorm_electric_selected_room_v1";
+const LEGACY_RECHARGE_STORAGE_KEY = "dorm_electric_recharge_confirmations_v1";
+
+function initialRoomId(){
+  const saved = localStorage.getItem(SELECTED_ROOM_STORAGE_KEY);
+  return ROOMS.some(room => room.id === saved) ? saved : "9979";
+}
+
+let currentRoomId = initialRoomId();
+
+function currentRoom(){
+  return ROOMS.find(room => room.id === currentRoomId) || ROOMS[0];
+}
+
 const TZ = "Asia/Shanghai";
 const CHINA_OFFSET = "+08:00";
 const PAGE_SIZE = 1000;
@@ -927,18 +1012,39 @@ let currentRows = [];
 let currentAnalysis = null;
 let refreshing = false;
 let pendingRechargeInterval = null;
-const RECHARGE_STORAGE_KEY = "dorm_electric_recharge_confirmations_v1";
+
+function rechargeStorageKey(roomId=currentRoomId){
+  return `dorm_electric_recharge_confirmations_v1_${roomId}`;
+}
+
+function migrateLegacyRechargeConfirmations(){
+  if(currentRoomId !== "9979") return;
+
+  const newKey = rechargeStorageKey("9979");
+  if(localStorage.getItem(newKey) !== null) return;
+
+  const legacy = localStorage.getItem(LEGACY_RECHARGE_STORAGE_KEY);
+  if(legacy !== null){
+    localStorage.setItem(newKey, legacy);
+  }
+}
 
 function loadRechargeConfirmations(){
+  migrateLegacyRechargeConfirmations();
   try{
-    return JSON.parse(localStorage.getItem(RECHARGE_STORAGE_KEY) || "{}");
+    return JSON.parse(
+      localStorage.getItem(rechargeStorageKey()) || "{}"
+    );
   }catch{
     return {};
   }
 }
 
 function saveRechargeConfirmations(data){
-  localStorage.setItem(RECHARGE_STORAGE_KEY, JSON.stringify(data));
+  localStorage.setItem(
+    rechargeStorageKey(),
+    JSON.stringify(data)
+  );
 }
 
 function intervalKey(previous,current){
@@ -1057,7 +1163,9 @@ function cleanRows(rows){
     const normalized = {
       id:row.id,
       created_at:new Date(timestamp).toISOString(),
-      balance
+      balance,
+      room_id:String(row.room_id ?? currentRoomId),
+      room_name:String(row.room_name ?? currentRoom().name)
     };
     const key = row.id == null
       ? `${normalized.created_at}|${normalized.balance}`
@@ -1270,14 +1378,16 @@ async function loadData(){
   const startIso = new Date(dayStartMs(windowStart)).toISOString();
 
   const anchorPromise = supabaseRequest({
-    select:"id,created_at,balance",
+    select:"id,created_at,balance,room_id,room_name",
+    room_id:`eq.${currentRoomId}`,
     created_at:`lt.${startIso}`,
     order:"created_at.desc,id.desc",
     limit:"1"
   });
 
   const firstPagePromise = supabaseRequest({
-    select:"id,created_at,balance",
+    select:"id,created_at,balance,room_id,room_name",
+    room_id:`eq.${currentRoomId}`,
     created_at:`gte.${startIso}`,
     order:"created_at.asc,id.asc",
     limit:String(PAGE_SIZE),
@@ -1294,7 +1404,8 @@ async function loadData(){
 
   while(page.length === PAGE_SIZE && pageNumber < MAX_PAGES){
     page = await supabaseRequest({
-      select:"id,created_at,balance",
+      select:"id,created_at,balance,room_id,room_name",
+      room_id:`eq.${currentRoomId}`,
       created_at:`gte.${startIso}`,
       order:"created_at.asc,id.asc",
       limit:String(PAGE_SIZE),
@@ -1306,7 +1417,7 @@ async function loadData(){
 
   const rows = cleanRows(collected);
   if(!rows.length){
-    throw new Error("Supabase electricity 表中还没有可用数据。");
+    throw new Error(`${currentRoom().name} 暂时还没有可用采集数据。`);
   }
   if(page.length === PAGE_SIZE && pageNumber >= MAX_PAGES){
     throw new Error("半年数据超过当前 10000 条读取上限，请提高 MAX_PAGES。");
@@ -1665,7 +1776,9 @@ function renderSchoolStyle(analysis, rows){
   const alert = $("schoolAlert");
   if(latest.balance < 1){
     alert.classList.remove("hidden");
-    alert.textContent = "余额不足 1 元，已进入邮箱提醒范围";
+    alert.textContent = currentRoom().emailAlert
+      ? "余额不足 1 元，已进入邮箱提醒范围"
+      : "余额不足 1 元";
   }else{
     alert.classList.add("hidden");
     alert.textContent = "";
@@ -1755,7 +1868,7 @@ async function refresh(showSuccess=false){
   try{
     const rows = await loadData();
     render(rows);
-    if(showSuccess) showToast(`刷新成功，当前余额 ${money(rows.at(-1).balance)} 元`);
+    if(showSuccess) showToast(`${currentRoom().name} 刷新成功，当前余额 ${money(rows.at(-1).balance)} 元`);
   }catch(error){
     console.error(error);
     setStatus("读取失败","error");
@@ -1773,10 +1886,13 @@ function exportCsv(){
     showToast("当前没有可导出的数据",true);
     return;
   }
+  const room = currentRoom();
   const lines = [
-    ["id","created_at_utc","beijing_time","balance"],
+    ["id","room_id","room_name","created_at_utc","beijing_time","balance"],
     ...currentRows.map(row => [
       row.id ?? "",
+      room.id,
+      room.name,
       row.created_at,
       cnTime(row.created_at,true),
       row.balance.toFixed(2)
@@ -1789,7 +1905,7 @@ function exportCsv(){
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = `electricity_${dayKey(new Date())}.csv`;
+  link.download = `electricity_${currentRoomId}_${dayKey(new Date())}.csv`;
   link.click();
   URL.revokeObjectURL(url);
 }
@@ -1798,7 +1914,7 @@ function exportCsv(){
 function openRechargePrompt(item){
   pendingRechargeInterval = item;
   $("rechargePrompt").textContent =
-    `检测到 ${cnTime(item.current.created_at,true)} 余额从 `
+    `${currentRoom().name}：检测到 ${cnTime(item.current.created_at,true)} 余额从 `
     + `${money(item.previous.balance)} 元上升到 ${money(item.current.balance)} 元。`
     + ` 余额净增加 ${money(item.inferred)} 元。请输入这次实际充值金额，`
     + `系统将重新计算该区间真实用电。`;
@@ -1855,6 +1971,41 @@ function confirmRechargeAmount(){
     render(currentRows);
   }
 }
+
+function setupRoomPicker(){
+  const picker = $("roomPicker");
+  picker.innerHTML = ROOMS.map(
+    room => `<option value="${room.id}">${room.name}</option>`
+  ).join("");
+  picker.value = currentRoomId;
+  $("currentRoomIdText").textContent = currentRoomId;
+}
+
+$("roomPicker").addEventListener("change",async event=>{
+  const nextRoomId = event.target.value;
+  if(nextRoomId === currentRoomId) return;
+
+  if($("rechargeModal").classList.contains("show")){
+    closeRechargePrompt();
+  }
+
+  currentRoomId = nextRoomId;
+  localStorage.setItem(
+    SELECTED_ROOM_STORAGE_KEY,
+    currentRoomId
+  );
+
+  $("currentRoomIdText").textContent = currentRoomId;
+  $("schoolBalance").textContent = "--";
+  $("schoolUpdated").textContent = `正在读取 ${currentRoom().name}`;
+  $("schoolAlert").classList.add("hidden");
+  selectedUsageMonth = null;
+  selectedUsageYear = null;
+  currentRows = [];
+  currentAnalysis = null;
+
+  await refresh(false);
+});
 
 $("saveRechargeBtn").addEventListener("click",confirmRechargeAmount);
 $("skipRechargeBtn").addEventListener("click",closeRechargePrompt);
@@ -1924,6 +2075,7 @@ window.addEventListener("offline",() => {
   showNotice("当前设备已离线，恢复网络后会自动重新读取。","error");
 });
 
+setupRoomPicker();
 refresh(false);
 setInterval(() => refresh(false),AUTO_REFRESH_MS);
 </script></body></html>
