@@ -1,379 +1,97 @@
 <!doctype html>
-<html lang="zh-CN">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#f4f7fb">
-  <title>寝室电费看板</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
-  <style>
-    :root{
-      --bg:#f4f7fb;
-      --card:rgba(255,255,255,.94);
-      --text:#172033;
-      --muted:#748096;
-      --border:#e6ebf2;
-      --blue:#4377f6;
-      --blue-dark:#295bd3;
-      --green:#12a57a;
-      --orange:#f59e42;
-      --red:#e95b68;
-      --shadow:0 14px 42px rgba(35,52,86,.08);
-      --radius:22px;
-    }
-    *{box-sizing:border-box}
-    html{color-scheme:light}
-    body{
-      margin:0;
-      min-height:100vh;
-      font-family:Inter,system-ui,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
-      color:var(--text);
-      background:
-        radial-gradient(circle at 5% 0,rgba(67,119,246,.10),transparent 27%),
-        radial-gradient(circle at 95% 8%,rgba(18,165,122,.09),transparent 25%),
-        var(--bg);
-    }
-    button{font:inherit}
-    .wrap{max-width:1180px;margin:auto;padding:24px 18px 42px}
-    .top{
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap:18px;
-      margin:4px 0 20px;
-    }
-    .brand{display:flex;align-items:center;gap:13px;min-width:0}
-    .logo{
-      width:48px;height:48px;display:grid;place-items:center;flex:0 0 auto;
-      color:white;font-size:23px;border-radius:16px;
-      background:linear-gradient(145deg,#5b8cff,#3166e8);
-      box-shadow:0 12px 28px rgba(67,119,246,.25);
-    }
-    h1{font-size:25px;margin:0;letter-spacing:-.4px}
-    .sub{
-      display:flex;align-items:center;gap:9px;flex-wrap:wrap;
-      font-size:12px;color:var(--muted);margin-top:5px;
-    }
-    .dot{width:4px;height:4px;border-radius:50%;background:#bdc6d3}
-    .actions{display:flex;align-items:center;gap:9px}
-    .btn{
-      border:1px solid var(--border);background:rgba(255,255,255,.9);
-      color:#455168;border-radius:12px;padding:10px 13px;cursor:pointer;
-      box-shadow:0 5px 16px rgba(35,52,86,.04);transition:.18s ease;
-    }
-    .btn:hover{border-color:#cfd8e6;transform:translateY(-1px)}
-    .btn.primary{background:var(--blue);border-color:var(--blue);color:white}
-    .btn:disabled{opacity:.58;cursor:wait;transform:none}
-    .status{
-      display:inline-flex;align-items:center;gap:7px;
-      padding:6px 10px;border-radius:999px;
-      color:var(--green);background:#e9f8f3;font-weight:650;
-    }
-    .status::before{
-      content:"";width:7px;height:7px;border-radius:50%;
-      background:currentColor;box-shadow:0 0 0 4px rgba(18,165,122,.10);
-    }
-    .status.loading{color:var(--blue);background:#edf3ff}
-    .status.warning{color:#b66b19;background:#fff5e8}
-    .status.error{color:#c43d4a;background:#fff0f1}
-    .notice{
-      display:none;margin-bottom:14px;padding:12px 14px;border-radius:14px;
-      border:1px solid #ffd7a8;background:#fff8ee;color:#92551a;
-      font-size:13px;line-height:1.55;
-    }
-    .notice.show{display:block}
-    .notice.error{border-color:#fecaca;background:#fff2f3;color:#a72f3b}
-    .hero{
-      display:grid;grid-template-columns:1.35fr repeat(3,1fr);
-      gap:14px;margin-bottom:14px;
-    }
-    .card{
-      background:var(--card);border:1px solid var(--border);
-      border-radius:var(--radius);box-shadow:var(--shadow);
-      backdrop-filter:blur(10px);
-    }
-    .metric{padding:20px;min-height:150px;position:relative;overflow:hidden}
-    .metric::after{
-      content:"";position:absolute;width:110px;height:110px;right:-36px;top:-43px;
-      border-radius:50%;background:currentColor;opacity:.05;
-    }
-    .metric.balance{
-      color:white;border:0;
-      background:linear-gradient(145deg,#467cf9,#2e60d4);
-      box-shadow:0 18px 40px rgba(46,96,212,.22);
-    }
-    .label{font-size:13px;color:var(--muted);margin-bottom:18px}
-    .balance .label,.balance .note,.balance .unit{color:rgba(255,255,255,.72)}
-    .value{
-      display:flex;align-items:baseline;gap:5px;
-      font-size:clamp(29px,4vw,40px);font-weight:780;letter-spacing:-1px;
-    }
-    .unit{font-size:13px;color:var(--muted);font-weight:550;letter-spacing:0}
-    .note{font-size:12px;color:var(--muted);margin-top:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    .strip{
-      display:grid;grid-template-columns:repeat(4,1fr);
-      gap:10px;margin-bottom:14px;
-    }
-    .mini{padding:15px 17px}
-    .mini-label{font-size:12px;color:var(--muted);margin-bottom:7px}
-    .mini-value{font-size:20px;font-weight:740}
-    .mini-value span{font-size:12px;color:var(--muted);font-weight:500;margin-left:3px}
-    .layout{
-      display:grid;grid-template-columns:minmax(0,1.55fr) minmax(330px,.85fr);
-      gap:14px;margin-bottom:14px;
-    }
-    .panel{padding:20px;min-width:0}
-    .panel-head{
-      display:flex;align-items:flex-start;justify-content:space-between;
-      gap:12px;margin-bottom:15px;
-    }
-    .panel h2{font-size:16px;margin:0}
-    .desc{font-size:12px;color:var(--muted);margin-top:5px}
-    .tabs{display:flex;gap:4px;padding:4px;border-radius:10px;background:#f2f5f9}
-    .tab{
-      border:0;background:transparent;color:var(--muted);
-      padding:6px 9px;border-radius:7px;font-size:12px;cursor:pointer;
-    }
-    .tab.active{background:white;color:var(--blue);box-shadow:0 3px 10px rgba(35,52,86,.08)}
-    .chartbox{height:286px}
-    .chartbox.small{height:250px}
-    .activity-list{max-height:313px;overflow:auto}
-    .activity{
-      display:grid;grid-template-columns:36px 1fr auto;
-      gap:10px;align-items:center;padding:11px 1px;
-      border-bottom:1px solid var(--border);
-    }
-    .activity:last-child{border-bottom:0}
-    .activity-icon{
-      width:34px;height:34px;display:grid;place-items:center;border-radius:11px;
-      color:var(--blue);background:#edf3ff;font-weight:800;
-    }
-    .activity.recharge .activity-icon{color:var(--green);background:#eaf8f3}
-    .activity-title{font-size:13px;font-weight:680}
-    .activity-time{font-size:11px;color:var(--muted);margin-top:3px}
-    .activity-amount{font-size:13px;font-weight:740}
-    .activity.recharge .activity-amount{color:var(--green)}
-    .table-wrap{overflow:auto}
-    table{width:100%;border-collapse:collapse}
-    th,td{
-      padding:11px 8px;border-bottom:1px solid var(--border);
-      font-size:12px;text-align:left;white-space:nowrap;
-    }
-    th{color:var(--muted);font-weight:650}
-    td:last-child,th:last-child{text-align:right}
-    .empty{padding:70px 10px;text-align:center;color:var(--muted);font-size:13px}
-    .footer{
-      font-size:12px;line-height:1.7;color:var(--muted);
-      text-align:center;margin:20px auto 4px;max-width:920px;
-    }
-    .toast{
-      position:fixed;right:20px;bottom:20px;z-index:30;
-      max-width:min(360px,calc(100% - 40px));padding:12px 15px;border-radius:12px;
-      background:#172033;color:white;box-shadow:0 16px 40px rgba(23,32,51,.22);
-      font-size:13px;opacity:0;transform:translateY(80px);transition:.22s ease;
-    }
-    .toast.show{opacity:1;transform:translateY(0)}
-    .toast.error{background:#862f39}
-
-    .modal{
-      position:fixed;inset:0;z-index:50;display:none;
-      align-items:center;justify-content:center;padding:18px;
-      background:rgba(23,32,51,.38);backdrop-filter:blur(4px);
-    }
-    .modal.show{display:flex}
-    .modal-card{
-      width:min(430px,100%);background:white;border-radius:20px;
-      border:1px solid var(--border);box-shadow:0 24px 70px rgba(23,32,51,.22);
-      padding:20px;
-    }
-    .modal-title{font-size:18px;font-weight:760;margin-bottom:6px}
-    .modal-desc{font-size:12px;color:var(--muted);line-height:1.6;margin-bottom:16px}
-    .field{margin-bottom:13px}
-    .field label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}
-    .field input{
-      width:100%;border:1px solid var(--border);border-radius:11px;
-      padding:11px 12px;font:inherit;color:var(--text);background:#fbfcfe;
-      outline:none;
-    }
-    .field input:focus{border-color:#aebff2;box-shadow:0 0 0 3px rgba(67,119,246,.10)}
-    .modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:17px}
-
-    @media(max-width:940px){
-      .hero{grid-template-columns:1fr 1fr}
-      .layout{grid-template-columns:1fr}
-    }
-    @media(max-width:640px){
-      .wrap{padding:14px 10px 32px}
-      .top{align-items:flex-start}
-      .logo{width:42px;height:42px;border-radius:14px}
-      h1{font-size:21px}
-      .actions{gap:6px}
-      .btn{padding:9px 10px;font-size:12px}
-      .btn.export{display:none}
-      .hero{grid-template-columns:1fr;gap:10px}
-      .metric{min-height:132px;padding:18px}
-      .label{margin-bottom:12px}
-      .strip{grid-template-columns:1fr 1fr}
-      .panel{padding:16px 12px;border-radius:18px}
-      .panel-head{flex-direction:column}
-      .chartbox{height:250px}
-      .chartbox.small{height:230px}
-    }
-  </style>
-</head>
-<body>
-<main class="wrap">
-  <header class="top">
-    <div class="brand">
-      <div class="logo">⚡</div>
-      <div>
-        <h1>寝室电费看板</h1>
-        <div class="sub">
-          <span id="status" class="status loading">正在读取</span>
-          <span class="dot"></span>
-          <span id="lastQuery">采集每小时执行 · 网页每 5 分钟刷新</span>
-        </div>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#20aaa8"><title>寝室电费监控</title><script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script><style>
+:root{--teal:#20aaa8;--teal2:#24c6a4;--bg:#f5f8fa;--card:#fff;--text:#20242a;--muted:#7c828c;--line:#e8ecef;--red:#ef5d67;--blue:#3978e8;--orange:#ef9d3d;--shadow:0 8px 28px rgba(25,55,75,.08)}
+*{box-sizing:border-box} html{color-scheme:light} body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}.hidden{display:none!important}button,input{font:inherit}.app{max-width:980px;margin:auto;padding:0 0 40px}.appbar{background:#fff;padding:14px 18px 10px;position:sticky;top:0;z-index:10;border-bottom:1px solid #eef1f3}.appbar-row{display:flex;align-items:center;justify-content:space-between;gap:10px}.app-title{font-weight:800;font-size:18px}.status{font-size:12px;padding:6px 10px;border-radius:999px;background:#eaf8f5;color:#148a78}.status.warning{background:#fff3df;color:#b96e13}.status.error{background:#ffebed;color:#c74250}.status.loading{background:#eef3ff;color:#3569d9}.school-hero{background:#fff;padding:16px 18px 8px}.balance-row{display:flex;align-items:end;justify-content:space-between;gap:16px}.balance-big{font-size:38px;font-weight:800;letter-spacing:-1px}.balance-big small{font-size:15px;font-weight:600;color:var(--muted);margin-left:5px}.updated{font-size:12px;color:var(--muted);text-align:right}.alert-strip{margin:12px 0 0;padding:10px 12px;border-radius:10px;font-size:13px}.alert-strip.ok{background:#ecfaf6;color:#137965}.alert-strip.warning{background:#fff6e7;color:#a56314}.alert-strip.danger{background:#ffedef;color:#bd3947}.main-tabs{display:grid;grid-template-columns:1fr 1fr;background:#fff;border-bottom:1px solid var(--line)}.main-tabs button{border:0;background:#fff;padding:16px 8px;font-family:"KaiTi","STKaiti",serif;font-size:22px;position:relative}.main-tabs button.active{color:var(--teal)}.main-tabs button.active:after{content:"";position:absolute;left:8%;right:8%;bottom:0;height:3px;background:var(--teal);border-radius:3px}.school-view{background:#fff;padding:20px 18px 24px}.picker-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:20px}.month-picker-wrap{position:relative;font-size:21px;font-weight:700}.month-picker-wrap input{position:absolute;inset:0;opacity:0;width:100%;cursor:pointer}.segmented{display:flex;background:#f2f3f4;border-radius:999px;padding:2px}.segmented button{border:0;background:transparent;padding:9px 16px;border-radius:999px;color:#555}.segmented button.active{background:var(--teal);color:#fff}.unit-note{display:flex;justify-content:space-between;align-items:center;color:#666;font-size:14px;padding-bottom:12px;border-bottom:1px solid var(--line)}.weekdays,.calendar-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:7px}.weekdays{padding:14px 0 10px;text-align:center;font-family:"KaiTi","STKaiti",serif;font-size:17px}.cal-day{min-height:65px;border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px}.cal-num{font-size:13px;color:#666}.cal-day b{font-family:Georgia,"Times New Roman",serif;font-size:16px;font-weight:500}.cal-day.max{background:#fff0f1;color:var(--red)}.cal-day.min{background:#eef3ff;color:var(--blue)}.cal-day.today{background:#eaf9f8;color:var(--teal)}.calendar-legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:#777;margin:16px 0}.legend-dot{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:5px;vertical-align:-1px}.legend-max{background:#f35c67}.legend-min{background:#3978e8}.legend-today{background:var(--teal)}.month-summary{border-top:1px solid var(--line);display:flex;justify-content:space-between;gap:10px;padding-top:14px}.month-summary div{display:flex;flex-direction:column}.month-summary b{font-size:23px}.month-summary small{color:var(--muted);margin-top:3px}.school-chart{height:330px;margin-top:8px}.year-tabs{display:flex;background:var(--teal);border-radius:999px;overflow:hidden;margin:4px auto 22px;max-width:560px}.year-pill{flex:1;border:0;background:transparent;color:white;padding:10px 8px;font-family:"KaiTi","STKaiti",serif;font-size:19px}.year-pill.active{background:#fff;color:var(--teal);border:2px solid var(--teal);border-radius:999px}.bill-list{display:grid;gap:12px;margin-top:22px}.bill-card{border:1px solid var(--line);border-radius:16px;padding:16px;background:#fcfcfd}.bill-month{font-family:"KaiTi","STKaiti",serif;font-weight:700;font-size:21px}.bill-period{font-size:12px;color:#9a9ea6;text-align:center;margin:9px 0}.bill-period span{color:var(--teal)}.bill-values{display:grid;grid-template-columns:1fr 1fr;gap:14px}.bill-values>div{display:flex;flex-direction:column}.bill-values b{font-size:26px;font-family:Georgia,"Times New Roman",serif}.bill-values small{color:#8a8f98;margin-top:4px}.details{padding:18px;display:grid;gap:14px}.details-title{font-size:16px;font-weight:800}.hero,.strip,.layout{display:grid;gap:12px}.hero{grid-template-columns:repeat(4,1fr)}.strip{grid-template-columns:repeat(4,1fr)}.layout{grid-template-columns:1fr 1fr}.card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:16px;box-shadow:var(--shadow)}.metric .label,.mini-label,.desc,.note{color:var(--muted);font-size:12px}.metric .value{font-size:25px;font-weight:800;margin:8px 0}.unit{font-size:13px;margin-left:4px;color:var(--muted)}.mini-value{margin-top:7px}.mini-value b{font-size:21px;margin-right:4px}.panel-head{display:flex;justify-content:space-between;gap:10px;align-items:center}.panel h2{font-size:16px;margin:0 0 4px}.chartbox{height:260px}.chartbox.small{height:240px}.tabs{display:flex;gap:6px}.tab{border:0;border-radius:999px;padding:6px 10px}.tab.active{background:var(--teal);color:white}.activity-list{display:grid;gap:8px;max-height:280px;overflow:auto}.activity{display:grid;grid-template-columns:32px 1fr auto;gap:8px;align-items:center;padding:9px 0;border-bottom:1px solid #f1f2f3}.activity-icon{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:#eef4ff;color:#3f6fe0}.activity.recharge .activity-icon{background:#eaf9f4;color:#11896f}.activity-title{font-size:13px}.activity-time{font-size:11px;color:#999;margin-top:3px}.activity-amount{font-weight:700}.table-wrap{overflow:auto}table{width:100%;border-collapse:collapse;font-size:12px}th,td{padding:10px 8px;text-align:left;border-bottom:1px solid #eef0f2;white-space:nowrap}.actions{display:flex;gap:8px}.btn{border:1px solid #dfe4e9;background:#fff;border-radius:10px;padding:8px 12px}.btn.primary{background:var(--teal);border-color:var(--teal);color:#fff}.notice{display:none;margin:0 18px 12px;padding:10px 12px;border-radius:10px;background:#fff5e7;color:#a56314;font-size:12px}.notice.show{display:block}.notice.error{background:#ffeded;color:#bd3947}.footer{color:#8b9098;font-size:11px;padding:4px 4px 18px}.modal{position:fixed;inset:0;background:rgba(0,0,0,.42);display:none;align-items:flex-end;justify-content:center;z-index:30}.modal.show{display:flex}.modal-card{width:min(100%,560px);background:#fff;border-radius:24px 24px 0 0;padding:22px}.modal-title{font-weight:800;font-size:20px}.modal-desc{color:#666;line-height:1.7;margin:9px 0 14px}.field label{display:block;font-size:13px;color:#666;margin-bottom:6px}.field input{width:100%;border:1px solid #dfe4e8;border-radius:10px;padding:12px}.modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}.toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%) translateY(12px);background:#20242a;color:#fff;padding:10px 14px;border-radius:10px;opacity:0;pointer-events:none;transition:.2s;z-index:50}.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}.toast.error{background:#be3d49}.empty{padding:25px;text-align:center;color:#999}
+@media(max-width:720px){.app{max-width:none}.school-view{padding-left:14px;padding-right:14px}.main-tabs button{font-size:20px}.picker-row{align-items:flex-start}.segmented button{padding:8px 13px}.cal-day{min-height:58px}.school-chart{height:300px}.hero,.strip,.layout{grid-template-columns:1fr 1fr}.details{padding:12px}.chartbox{height:240px}.bill-values b{font-size:23px}}
+@media(max-width:420px){.balance-big{font-size:34px}.updated{font-size:10px}.month-picker-wrap{font-size:19px}.segmented button{font-size:13px}.weekdays,.calendar-grid{gap:4px}.cal-day{min-height:55px}.cal-day b{font-size:14px}.hero,.strip,.layout{grid-template-columns:1fr}.details{padding:10px}.school-chart{height:270px}}
+</style></head><body>
+<div class="app">
+  <header class="appbar">
+    <div class="appbar-row">
+      <div class="app-title">寝室电费</div>
+      <div class="actions">
+        <button id="exportBtn" class="btn" type="button">导出</button>
+        <button id="refreshBtn" class="btn primary" type="button">刷新</button>
       </div>
     </div>
-    <div class="actions">
-      <button id="exportBtn" class="btn export" type="button">导出数据</button>
-      <button id="refreshBtn" class="btn primary" type="button">刷新数据</button>
+    <div style="margin-top:8px;display:flex;align-items:center;justify-content:space-between;gap:8px">
+      <span id="status" class="status loading">正在读取</span>
+      <span id="lastQuery" style="font-size:11px;color:#92969d">采集每小时执行</span>
     </div>
   </header>
 
+  <section class="school-hero">
+    <div class="balance-row">
+      <div><div style="font-size:12px;color:#7b818a">当前余额</div><div class="balance-big"><span id="schoolBalance">--</span><small>元</small></div></div>
+      <div id="schoolUpdated" class="updated">等待数据</div>
+    </div>
+    <div id="schoolAlert" class="alert-strip ok">低余额提醒状态</div>
+  </section>
+
+  <nav class="main-tabs">
+    <button id="dailyMainTab" class="active" type="button">日用电量</button>
+    <button id="monthlyMainTab" type="button">月度电费</button>
+  </nav>
+
   <div id="notice" class="notice"></div>
 
-  <section class="hero">
-    <article class="card metric balance">
-      <div class="label">当前余额</div>
-      <div class="value"><span id="balance">--</span><span class="unit">元</span></div>
-      <div id="balanceNote" class="note">等待第一条数据</div>
-    </article>
-    <article class="card metric">
-      <div class="label">今日用电</div>
-      <div class="value"><span id="todayUsage">--</span><span class="unit">元</span></div>
-      <div id="todayCompare" class="note">昨日 -- 元</div>
-    </article>
-    <article class="card metric">
-      <div class="label">本月累计用电</div>
-      <div class="value"><span id="monthUsage">--</span><span class="unit">元</span></div>
-      <div id="monthProjectionNote" class="note">月末预计 -- 元</div>
-    </article>
-    <article class="card metric">
-      <div class="label">预计还可使用</div>
-      <div class="value"><span id="remainingDays">--</span><span class="unit">天</span></div>
-      <div class="note">按最近 7 个有效日的日均估算</div>
-    </article>
-  </section>
-
-  <section class="strip">
-    <article class="card mini">
-      <div class="mini-label">昨日用电</div>
-      <div class="mini-value"><b id="yesterdayUsage">--</b><span>元</span></div>
-    </article>
-    <article class="card mini">
-      <div class="mini-label">最近有效日均</div>
-      <div class="mini-value"><b id="averageDaily">--</b><span>元/天</span></div>
-    </article>
-    <article class="card mini">
-      <div class="mini-label">本月充值</div>
-      <div class="mini-value"><b id="monthRecharge">--</b><span>元</span></div>
-    </article>
-    <article class="card mini">
-      <div class="mini-label">月末用电预计</div>
-      <div class="mini-value"><b id="projectedMonth">--</b><span>元</span></div>
-    </article>
-  </section>
-
-  <section class="layout">
-    <article class="card panel">
-      <div class="panel-head">
-        <div>
-          <h2>最近 72 小时余额</h2>
-          <div class="desc">发现余额上升时会询问实际充值金额，并据此校正用电</div>
-        </div>
-      </div>
-      <div class="chartbox"><canvas id="balanceChart"></canvas></div>
-    </article>
-
-    <article class="card panel">
-      <div class="panel-head">
-        <div>
-          <h2>最近余额变动</h2>
-          <div class="desc">已确认充值会用于重新计算该区间真实用电</div>
-        </div>
-      </div>
-      <div id="activityList" class="activity-list"></div>
-    </article>
-  </section>
-
-  <section class="layout">
-    <article class="card panel">
-      <div class="panel-head">
-        <div>
-          <h2>每日用电</h2>
-          <div class="desc">跨午夜区间会按时长分摊到两个自然日</div>
-        </div>
-        <div class="tabs">
-          <button class="tab active" data-days="7" type="button">近 7 天</button>
-          <button class="tab" data-days="30" type="button">近 30 天</button>
-        </div>
-      </div>
-      <div class="chartbox"><canvas id="dailyChart"></canvas></div>
-    </article>
-
-    <article class="card panel">
-      <div class="panel-head">
-        <div>
-          <h2>近 6 个月统计</h2>
-          <div class="desc">用电与充值分别展示</div>
-        </div>
-      </div>
-      <div class="chartbox small"><canvas id="monthlyChart"></canvas></div>
-    </article>
-  </section>
-
-  <section class="card panel">
-    <div class="panel-head">
-      <div>
-        <h2>最近原始记录</h2>
-        <div id="recordDesc" class="desc">来自 Supabase electricity 表</div>
+  <section id="dailyView" class="school-view">
+    <div class="picker-row">
+      <div class="month-picker-wrap"><span id="monthPickerLabel">选择月份</span> ▾<input id="monthPicker" type="month"></div>
+      <div class="segmented">
+        <button id="calendarModeBtn" class="active" type="button">用电日历</button>
+        <button id="trendModeBtn" type="button">电量趋势</button>
       </div>
     </div>
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr><th>北京时间</th><th>记录 ID</th><th>与上次间隔</th><th>余额</th></tr>
-        </thead>
-        <tbody id="recentBody"></tbody>
-      </table>
+    <div class="unit-note"><span>单位：千瓦时</span><span>☼ 点击日期查看当天用电情况</span></div>
+    <div id="calendarPanel">
+      <div class="weekdays"><span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span></div>
+      <div id="usageCalendar" class="calendar-grid"></div>
+      <div class="calendar-legend"><span><i class="legend-dot legend-max"></i>当月最高用电量</span><span><i class="legend-dot legend-min"></i>当月最低用电量</span><span><i class="legend-dot legend-today"></i>当前日期</span></div>
+    </div>
+    <div id="trendPanel" class="hidden"><div class="school-chart"><canvas id="schoolDailyChart"></canvas></div></div>
+    <div class="month-summary">
+      <div><b id="selectedMonthTotalKwh">--</b><small>本月累计电量（千瓦时，按单价估算）</small></div>
+      <div style="text-align:right"><b id="selectedMonthTotalYuan">--</b><small>本月累计电费（元）</small></div>
     </div>
   </section>
 
-  <div class="footer">
-    统计说明：当检测到余额上升时，网页会询问该区间的实际充值金额。
-    校正后的用电 = 上次余额 + 实际充值金额 − 本次余额；充值统计使用你输入的实际金额。
-    人工确认仅保存在当前浏览器 localStorage，不会写入 Supabase。
-  </div>
-</main>
+  <section id="monthlyView" class="school-view hidden">
+    <div id="yearTabs" class="year-tabs"></div>
+    <div class="unit-note"><span>单位：千瓦时</span><span>☼ 柱状图查看各月用电</span></div>
+    <div class="school-chart"><canvas id="schoolYearChart"></canvas></div>
+    <div id="monthBillList" class="bill-list"></div>
+  </section>
 
-<div id="rechargeModal" class="modal" aria-hidden="true">
-  <div class="modal-card">
-    <div class="modal-title">发现可能充值</div>
-    <div id="rechargePrompt" class="modal-desc"></div>
-    <div class="field">
-      <label for="rechargeAmount">实际充值金额（元）</label>
-      <input id="rechargeAmount" type="number" min="0.01" max="10000" step="0.01" inputmode="decimal" placeholder="例如 50">
-    </div>
-    <div class="modal-actions">
-      <button id="skipRechargeBtn" class="btn" type="button">稍后确认</button>
-      <button id="saveRechargeBtn" class="btn primary" type="button">确认并重算</button>
-    </div>
-  </div>
+  <section class="details">
+    <div class="details-title">监控详情</div>
+    <section class="hero">
+      <article class="card metric balance"><div class="label">当前余额</div><div class="value"><span id="balance">--</span><span class="unit">元</span></div><div id="balanceNote" class="note">等待第一条数据</div></article>
+      <article class="card metric"><div class="label">今日用电</div><div class="value"><span id="todayUsage">--</span><span class="unit">元</span></div><div id="todayCompare" class="note">昨日 -- 元</div></article>
+      <article class="card metric"><div class="label">本月累计用电</div><div class="value"><span id="monthUsage">--</span><span class="unit">元</span></div><div id="monthProjectionNote" class="note">月末预计 -- 元</div></article>
+      <article class="card metric"><div class="label">预计还可使用</div><div class="value"><span id="remainingDays">--</span><span class="unit">天</span></div><div class="note">按最近有效日均估算</div></article>
+    </section>
+    <section class="strip">
+      <article class="card mini"><div class="mini-label">昨日用电</div><div class="mini-value"><b id="yesterdayUsage">--</b><span>元</span></div></article>
+      <article class="card mini"><div class="mini-label">最近有效日均</div><div class="mini-value"><b id="averageDaily">--</b><span>元/天</span></div></article>
+      <article class="card mini"><div class="mini-label">本月充值</div><div class="mini-value"><b id="monthRecharge">--</b><span>元</span></div></article>
+      <article class="card mini"><div class="mini-label">月末预计</div><div class="mini-value"><b id="projectedMonth">--</b><span>元</span></div></article>
+    </section>
+    <section class="layout">
+      <article class="card panel"><div class="panel-head"><div><h2>最近 72 小时余额</h2><div class="desc">余额上升会触发充值确认</div></div></div><div class="chartbox"><canvas id="balanceChart"></canvas></div></article>
+      <article class="card panel"><div class="panel-head"><div><h2>最近余额变动</h2><div class="desc">充值校正后重新计算真实用电</div></div></div><div id="activityList" class="activity-list"></div></article>
+    </section>
+    <section class="layout">
+      <article class="card panel"><div class="panel-head"><div><h2>每日用电</h2><div class="desc">按北京时间自然日统计</div></div><div class="tabs"><button class="tab active" data-days="7" type="button">近 7 天</button><button class="tab" data-days="30" type="button">近 30 天</button></div></div><div class="chartbox"><canvas id="dailyChart"></canvas></div></article>
+      <article class="card panel"><div class="panel-head"><div><h2>近 6 个月统计</h2><div class="desc">用电与充值分别展示</div></div></div><div class="chartbox small"><canvas id="monthlyChart"></canvas></div></article>
+    </section>
+    <section class="card panel"><div class="panel-head"><div><h2>最近原始记录</h2><div id="recordDesc" class="desc">来自 Supabase electricity 表</div></div></div><div class="table-wrap"><table><thead><tr><th>北京时间</th><th>记录 ID</th><th>与上次间隔</th><th>余额</th></tr></thead><tbody id="recentBody"></tbody></table></div></section>
+    <div class="footer">电量(kWh)按 ELECTRICITY_PRICE = 0.558 元/kWh 估算；如实际电价不同，请修改该常量。充值确认仍保存在当前浏览器 localStorage。</div>
+  </section>
 </div>
 
+<div id="rechargeModal" class="modal" aria-hidden="true"><div class="modal-card"><div class="modal-title">发现可能充值</div><div id="rechargePrompt" class="modal-desc"></div><div class="field"><label for="rechargeAmount">实际充值金额（元）</label><input id="rechargeAmount" type="number" min="0.01" max="10000" step="0.01" inputmode="decimal" placeholder="例如 50"></div><div class="modal-actions"><button id="skipRechargeBtn" class="btn" type="button">稍后确认</button><button id="saveRechargeBtn" class="btn primary" type="button">确认并重算</button></div></div></div>
 <div id="toast" class="toast"></div>
-
 <script>
 const SUPABASE_URL = "https://qqlvyohgxbmvbtxgvwxw.supabase.co";
 const SUPABASE_PUBLIC_KEY = "sb_publishable_paoG7O2340i2xo2igiLJbw_6ZZTY1UK";
@@ -382,6 +100,7 @@ const TZ = "Asia/Shanghai";
 const CHINA_OFFSET = "+08:00";
 const PAGE_SIZE = 1000;
 const MAX_PAGES = 10;
+const ELECTRICITY_PRICE = 0.558; // 元/千瓦时：按你截图中 133.36 元 / 239 kWh 估算，可自行修改
 const LOW_BALANCE_THRESHOLD = 20;
 const BALANCE_EPSILON = 0.005;
 const NORMAL_GAP_HOURS = 2.5;
@@ -416,6 +135,7 @@ function intervalKey(previous,current){
 
 const $ = id => document.getElementById(id);
 const money = value => Number.isFinite(Number(value)) ? Number(value).toFixed(2) : "--";
+const kwh = value => Number.isFinite(Number(value)) ? (Number(value) / ELECTRICITY_PRICE).toFixed(2) : "--";
 
 function chinaParts(value){
   const parts = new Intl.DateTimeFormat("zh-CN", {
@@ -733,7 +453,7 @@ async function loadData(){
     throw new Error("网页只能使用 Supabase publishable/anon key，不能使用 service_role 或 secret key。");
   }
 
-  const firstMonth = monthKeys(6)[0];
+  const firstMonth = monthKeys(12)[0];
   const windowStart = `${firstMonth}-01`;
   const startIso = new Date(dayStartMs(windowStart)).toISOString();
 
@@ -967,6 +687,173 @@ function showToast(message,isError=false){
   showToast.timer = setTimeout(() => node.className = "toast", 3000);
 }
 
+
+let schoolDailyChart;
+let schoolYearChart;
+let selectedUsageMonth = null;
+let selectedUsageYear = null;
+let dailyDisplayMode = "calendar";
+
+function monthLabel(key){
+  const [y,m] = key.split("-");
+  return `${y}年${Number(m)}月`;
+}
+
+function getAvailableMonths(analysis){
+  return Object.keys(analysis.months || {}).sort();
+}
+
+function renderUsageCalendar(analysis, month){
+  const grid = $("usageCalendar");
+  if(!grid) return;
+  const [year,mon] = month.split("-").map(Number);
+  const days = new Date(year, mon, 0).getDate();
+  const firstWeekday = new Date(year, mon - 1, 1).getDay();
+  const values = [];
+  for(let d=1; d<=days; d++){
+    const key = `${year}-${String(mon).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+    values.push({d,key,usage:analysis.byDay[key]?.usage || 0});
+  }
+  const positive = values.filter(v => v.usage > BALANCE_EPSILON);
+  const maxUsage = positive.length ? Math.max(...positive.map(v=>v.usage)) : null;
+  const minUsage = positive.length ? Math.min(...positive.map(v=>v.usage)) : null;
+  const today = dayKey(new Date());
+  const blanks = Array.from({length:firstWeekday},()=>'<div class="cal-empty"></div>').join("");
+  const cells = values.map(v=>{
+    const isMax = maxUsage != null && Math.abs(v.usage-maxUsage) < 1e-9;
+    const isMin = minUsage != null && Math.abs(v.usage-minUsage) < 1e-9;
+    const isToday = v.key === today;
+    const cls = ["cal-day",isMax?"max":"",isMin?"min":"",isToday?"today":""].filter(Boolean).join(" ");
+    return `<div class="${cls}" title="${v.key} · ${money(v.usage)} 元">
+      <span class="cal-num">${v.d}</span>
+      <b>${v.usage > BALANCE_EPSILON ? kwh(v.usage) : ""}</b>
+    </div>`;
+  }).join("");
+  grid.innerHTML = blanks + cells;
+
+  const totalYuan = analysis.months[month]?.usage || 0;
+  $("selectedMonthTotalKwh").textContent = kwh(totalYuan);
+  $("selectedMonthTotalYuan").textContent = money(totalYuan);
+}
+
+function renderDailyMonthTrend(analysis, month){
+  if(!$("schoolDailyChart") || typeof Chart === "undefined") return;
+  const [year,mon] = month.split("-").map(Number);
+  const days = new Date(year,mon,0).getDate();
+  const keys = Array.from({length:days},(_,i)=>`${year}-${String(mon).padStart(2,"0")}-${String(i+1).padStart(2,"0")}`);
+  schoolDailyChart?.destroy();
+  schoolDailyChart = new Chart($("schoolDailyChart"),{
+    type:"line",
+    data:{
+      labels:keys.map(k=>k.slice(5).replace("-","/")),
+      datasets:[{
+        data:keys.map(k=>(analysis.byDay[k]?.usage || 0)/ELECTRICITY_PRICE),
+        borderColor:"#20aaa8",
+        backgroundColor:"rgba(32,170,168,.10)",
+        fill:true,
+        tension:.28,
+        pointRadius:3,
+        pointHoverRadius:5,
+        borderWidth:2
+      }]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${Number(c.raw).toFixed(2)} kWh`}}},
+      scales:{
+        x:{grid:{display:false},ticks:{maxTicksLimit:9,color:"#81868f"}},
+        y:{beginAtZero:true,grid:{color:"rgba(24,33,43,.09)"},ticks:{color:"#81868f"}}
+      }
+    }
+  });
+}
+
+function renderYearPanel(analysis, year){
+  const yearNum = Number(year);
+  const monthKeysForYear = Array.from({length:12},(_,i)=>`${yearNum}-${String(i+1).padStart(2,"0")}`);
+  schoolYearChart?.destroy();
+  if($("schoolYearChart") && typeof Chart !== "undefined"){
+    schoolYearChart = new Chart($("schoolYearChart"),{
+      type:"bar",
+      data:{
+        labels:monthKeysForYear.map((_,i)=>`${i+1}月`),
+        datasets:[{
+          data:monthKeysForYear.map(k=>(analysis.months[k]?.usage || 0)/ELECTRICITY_PRICE),
+          backgroundColor:"rgba(28,193,165,.90)",
+          hoverBackgroundColor:"#19aa9f",
+          borderRadius:2,
+          maxBarThickness:30
+        }]
+      },
+      options:{
+        responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${Number(c.raw).toFixed(2)} kWh`}}},
+        scales:{
+          x:{grid:{display:false},ticks:{color:"#555"}},
+          y:{beginAtZero:true,grid:{color:"rgba(24,33,43,.12)"},ticks:{color:"#666"}}
+        }
+      }
+    });
+  }
+  const list = $("monthBillList");
+  if(list){
+    const cards = monthKeysForYear.slice().reverse().filter(k => (analysis.months[k]?.usage || 0) > BALANCE_EPSILON);
+    list.innerHTML = cards.length ? cards.map(k=>{
+      const yuan = analysis.months[k]?.usage || 0;
+      return `<div class="bill-card">
+        <div class="bill-month">${monthLabel(k)}</div>
+        <div class="bill-period">${k.replace("-","/")}/01 - 月末 <span>（估算统计）</span></div>
+        <div class="bill-values">
+          <div><b>${money(yuan)}</b><small>本期电费（元）</small></div>
+          <div><b>${kwh(yuan)}</b><small>本期电量（千瓦时）</small></div>
+        </div>
+      </div>`;
+    }).join("") : '<div class="empty">该年份暂无采集数据</div>';
+  }
+}
+
+function renderSchoolStyle(analysis, rows){
+  const latest = rows.at(-1);
+  $("schoolBalance").textContent = money(latest.balance);
+  $("schoolUpdated").textContent = `最近采集：${cnTime(latest.created_at,true)}`;
+  const alert = $("schoolAlert");
+  if(latest.balance < 1){
+    alert.className = "alert-strip danger";
+    alert.textContent = "紧急：余额低于 1 元，collector 会尝试发送微信提醒";
+  }else if(latest.balance < 3){
+    alert.className = "alert-strip warning";
+    alert.textContent = "预警：余额低于 3 元，collector 会尝试发送邮箱提醒";
+  }else{
+    alert.className = "alert-strip ok";
+    alert.textContent = "余额正常 · 低于 3 元邮箱预警 · 低于 1 元微信紧急提醒";
+  }
+
+  const availableMonths = getAvailableMonths(analysis);
+  const current = monthKey(new Date());
+  if(!selectedUsageMonth || !availableMonths.includes(selectedUsageMonth)){
+    selectedUsageMonth = availableMonths.includes(current) ? current : (availableMonths.at(-1) || current);
+  }
+  $("monthPicker").value = selectedUsageMonth;
+  $("monthPickerLabel").textContent = monthLabel(selectedUsageMonth);
+  renderUsageCalendar(analysis,selectedUsageMonth);
+  renderDailyMonthTrend(analysis,selectedUsageMonth);
+
+  const years = [...new Set(availableMonths.map(k=>k.slice(0,4)))].sort().reverse();
+  if(!selectedUsageYear || !years.includes(String(selectedUsageYear))){
+    selectedUsageYear = years[0] || String(new Date().getFullYear());
+  }
+  const yearTabs = $("yearTabs");
+  yearTabs.innerHTML = (years.length?years:[selectedUsageYear]).map(y=>
+    `<button type="button" class="year-pill ${String(y)===String(selectedUsageYear)?"active":""}" data-year="${y}">${y}年</button>`
+  ).join("");
+  yearTabs.querySelectorAll(".year-pill").forEach(btn=>btn.addEventListener("click",()=>{
+    selectedUsageYear = btn.dataset.year;
+    renderYearPanel(currentAnalysis,selectedUsageYear);
+    renderSchoolStyle(currentAnalysis,currentRows);
+  }));
+  renderYearPanel(analysis,selectedUsageYear);
+}
+
 function render(rows){
   currentRows = rows;
   currentAnalysis = analyze(rows);
@@ -1016,6 +903,7 @@ function render(rows){
     openRechargePrompt(a.unconfirmedRecharges[0]);
   }
 
+  renderSchoolStyle(a,rows);
   renderCharts(rows,a);
   renderActivities(a.activities);
   renderRecentRows(rows);
@@ -1150,6 +1038,46 @@ document.querySelectorAll(".tab").forEach(tab => {
   });
 });
 
+
+
+// 仿学校应用的主视图切换
+$("dailyMainTab").addEventListener("click",()=>{
+  $("dailyMainTab").classList.add("active");
+  $("monthlyMainTab").classList.remove("active");
+  $("dailyView").classList.remove("hidden");
+  $("monthlyView").classList.add("hidden");
+});
+$("monthlyMainTab").addEventListener("click",()=>{
+  $("monthlyMainTab").classList.add("active");
+  $("dailyMainTab").classList.remove("active");
+  $("monthlyView").classList.remove("hidden");
+  $("dailyView").classList.add("hidden");
+  if(currentAnalysis) renderYearPanel(currentAnalysis,selectedUsageYear || String(new Date().getFullYear()));
+});
+$("calendarModeBtn").addEventListener("click",()=>{
+  dailyDisplayMode="calendar";
+  $("calendarModeBtn").classList.add("active");
+  $("trendModeBtn").classList.remove("active");
+  $("calendarPanel").classList.remove("hidden");
+  $("trendPanel").classList.add("hidden");
+});
+$("trendModeBtn").addEventListener("click",()=>{
+  dailyDisplayMode="trend";
+  $("trendModeBtn").classList.add("active");
+  $("calendarModeBtn").classList.remove("active");
+  $("trendPanel").classList.remove("hidden");
+  $("calendarPanel").classList.add("hidden");
+  if(currentAnalysis) renderDailyMonthTrend(currentAnalysis,selectedUsageMonth);
+});
+$("monthPicker").addEventListener("change",event=>{
+  selectedUsageMonth=event.target.value;
+  if(currentAnalysis){
+    $("monthPickerLabel").textContent=monthLabel(selectedUsageMonth);
+    renderUsageCalendar(currentAnalysis,selectedUsageMonth);
+    renderDailyMonthTrend(currentAnalysis,selectedUsageMonth);
+  }
+});
+
 window.addEventListener("online",() => refresh(false));
 window.addEventListener("offline",() => {
   setStatus("网络已断开","error");
@@ -1158,6 +1086,4 @@ window.addEventListener("offline",() => {
 
 refresh(false);
 setInterval(() => refresh(false),AUTO_REFRESH_MS);
-</script>
-</body>
-</html>
+</script></body></html>
