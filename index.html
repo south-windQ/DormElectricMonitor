@@ -74,6 +74,25 @@ button{outline:none}
   letter-spacing:.2px;
 }
 .actions{display:flex;gap:10px;flex-wrap:wrap}
+.recharge-action{
+  display:inline-flex;
+  align-items:center;
+  gap:7px;
+}
+.recharge-badge{
+  min-width:20px;
+  height:20px;
+  padding:0 6px;
+  border-radius:999px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  background:#e95667;
+  color:#fff;
+  font-size:11px;
+  font-weight:800;
+  line-height:1;
+}
 .btn{
   border:1px solid var(--line-strong);
   background:#fff;
@@ -832,6 +851,10 @@ button{outline:none}
     <div class="appbar-row">
       <div class="app-title">寝室电费</div>
       <div class="actions">
+        <button id="rechargeManageBtn" class="btn recharge-action" type="button">
+          充值校准
+          <span id="rechargePendingBadge" class="recharge-badge hidden">0</span>
+        </button>
         <button id="exportBtn" class="btn" type="button">导出</button>
         <button id="refreshBtn" class="btn primary" type="button">刷新数据</button>
       </div>
@@ -970,7 +993,20 @@ button{outline:none}
   </section>
 </div>
 
-<div id="rechargeModal" class="modal" aria-hidden="true"><div class="modal-card"><div class="modal-title">发现可能充值</div><div id="rechargePrompt" class="modal-desc"></div><div class="field"><label for="rechargeAmount">实际充值金额（元）</label><input id="rechargeAmount" type="number" min="0.01" max="10000" step="0.01" inputmode="decimal" placeholder="例如 50"></div><div class="modal-actions"><button id="skipRechargeBtn" class="btn" type="button">稍后确认</button><button id="saveRechargeBtn" class="btn primary" type="button">确认并重算</button></div></div></div>
+<div id="rechargeModal" class="modal" aria-hidden="true">
+  <div class="modal-card">
+    <div class="modal-title">充值校准</div>
+    <div id="rechargePrompt" class="modal-desc"></div>
+    <div class="field">
+      <label for="rechargeAmount">实际充值金额（元）</label>
+      <input id="rechargeAmount" type="number" min="0.01" max="10000" step="0.01" inputmode="decimal" placeholder="例如 50">
+    </div>
+    <div class="modal-actions">
+      <button id="skipRechargeBtn" class="btn" type="button">关闭</button>
+      <button id="saveRechargeBtn" class="btn primary" type="button">确认校准</button>
+    </div>
+  </div>
+</div>
 <div id="toast" class="toast"></div>
 <script>
 const SUPABASE_URL = "https://qqlvyohgxbmvbtxgvwxw.supabase.co";
@@ -982,7 +1018,6 @@ const ROOMS = [
 ];
 
 const SELECTED_ROOM_STORAGE_KEY = "dorm_electric_selected_room_v1";
-const LEGACY_RECHARGE_STORAGE_KEY = "dorm_electric_recharge_confirmations_v1";
 
 function initialRoomId(){
   const saved = localStorage.getItem(SELECTED_ROOM_STORAGE_KEY);
@@ -1010,46 +1045,9 @@ let monthlyChart;
 let dailyRange = 7;
 let currentRows = [];
 let currentAnalysis = null;
+let currentRechargeAdjustments = [];
 let refreshing = false;
-let pendingRechargeInterval = null;
-
-function rechargeStorageKey(roomId=currentRoomId){
-  return `dorm_electric_recharge_confirmations_v1_${roomId}`;
-}
-
-function migrateLegacyRechargeConfirmations(){
-  if(currentRoomId !== "9979") return;
-
-  const newKey = rechargeStorageKey("9979");
-  if(localStorage.getItem(newKey) !== null) return;
-
-  const legacy = localStorage.getItem(LEGACY_RECHARGE_STORAGE_KEY);
-  if(legacy !== null){
-    localStorage.setItem(newKey, legacy);
-  }
-}
-
-function loadRechargeConfirmations(){
-  migrateLegacyRechargeConfirmations();
-  try{
-    return JSON.parse(
-      localStorage.getItem(rechargeStorageKey()) || "{}"
-    );
-  }catch{
-    return {};
-  }
-}
-
-function saveRechargeConfirmations(data){
-  localStorage.setItem(
-    rechargeStorageKey(),
-    JSON.stringify(data)
-  );
-}
-
-function intervalKey(previous,current){
-  return `${previous.id ?? previous.created_at}->${current.id ?? current.created_at}`;
-}
+let pendingRechargeAdjustment = null;
 
 
 const $ = id => document.getElementById(id);
@@ -1178,12 +1176,14 @@ function cleanRows(rows){
   );
 }
 
-function analyze(rows){
+function analyze(rows, rechargeAdjustments=[]){
   const byDay = {};
   const activities = [];
   let longGapCount = 0;
   let rechargeIntervalCount = 0;
-  const confirmations = loadRechargeConfirmations();
+  const adjustmentByCurrentId = new Map(
+    rechargeAdjustments.map(item => [String(item.current_record_id), item])
+  );
   const unconfirmedRecharges = [];
 
   for(let index = 1; index < rows.length; index++){
@@ -1203,12 +1203,16 @@ function analyze(rows){
     }
 
     const netChange = current.balance - previous.balance;
-    const key = intervalKey(previous,current);
 
     if(netChange > BALANCE_EPSILON){
-      const saved = confirmations[key];
-      if(saved && Number(saved.amount) > 0){
-        const rechargeAmount = Number(saved.amount);
+      const adjustment = adjustmentByCurrentId.get(String(current.id));
+      const confirmed =
+        adjustment
+        && adjustment.status === "confirmed"
+        && Number(adjustment.actual_recharge) > 0;
+
+      if(confirmed){
+        const rechargeAmount = Number(adjustment.actual_recharge);
         const usage = Math.max(
           0,
           previous.balance + rechargeAmount - current.balance
@@ -1244,8 +1248,8 @@ function analyze(rows){
           });
         }
       }else{
-        // 未确认前，暂时按余额净增加额作为充值估计，但不把它算成“已确认充值”。
-        const inferred = netChange;
+        // 待确认期间只按“余额净增加”临时估算充值，真实金额确认后自动重算。
+        const inferred = Number(adjustment?.observed_increase ?? netChange);
         const rechargeDay = dayKey(current.created_at);
         ensureDay(byDay,rechargeDay).recharge += inferred;
 
@@ -1259,12 +1263,9 @@ function analyze(rows){
           gapHours
         });
 
-        unconfirmedRecharges.push({
-          key,
-          previous,
-          current,
-          inferred
-        });
+        if(adjustment && adjustment.status === "pending"){
+          unconfirmedRecharges.push(adjustment);
+        }
       }
       continue;
     }
@@ -1363,6 +1364,45 @@ async function supabaseRequest(params){
     throw new Error(`Supabase 读取失败：HTTP ${response.status}\n${message}`);
   }
   return response.json();
+}
+
+
+async function rechargeRequest(params={}, options={}){
+  const url = new URL(`${SUPABASE_URL}/rest/v1/recharge_adjustments`);
+  for(const [key,value] of Object.entries(params)){
+    url.searchParams.set(key, value);
+  }
+
+  const response = await fetch(url, {
+    method:options.method || "GET",
+    cache:"no-store",
+    headers:{
+      apikey:SUPABASE_PUBLIC_KEY,
+      Authorization:`Bearer ${SUPABASE_PUBLIC_KEY}`,
+      "Content-Type":"application/json",
+      ...(options.headers || {})
+    },
+    body:options.body ? JSON.stringify(options.body) : undefined
+  });
+
+  if(!response.ok){
+    const message = await response.text();
+    throw new Error(
+      `Supabase 充值校准请求失败：HTTP ${response.status}\n${message}`
+    );
+  }
+
+  if(response.status === 204) return [];
+  const text = await response.text();
+  return text ? JSON.parse(text) : [];
+}
+
+async function loadRechargeAdjustments(){
+  return rechargeRequest({
+    select:"id,room_id,room_name,previous_record_id,current_record_id,previous_balance,current_balance,observed_increase,actual_recharge,status,detected_at,confirmed_at",
+    room_id:`eq.${currentRoomId}`,
+    order:"detected_at.asc,id.asc"
+  });
 }
 
 async function loadData(){
@@ -1821,9 +1861,10 @@ function renderSchoolStyle(analysis, rows){
   renderYearPanel(analysis,selectedUsageYear);
 }
 
-function render(rows){
+function render(rows, rechargeAdjustments=[]){
   currentRows = rows;
-  currentAnalysis = analyze(rows);
+  currentRechargeAdjustments = rechargeAdjustments;
+  currentAnalysis = analyze(rows, rechargeAdjustments);
   const a = currentAnalysis;
   const latest = rows.at(-1);
 
@@ -1848,9 +1889,7 @@ function render(rows){
   // 普通统计提示不再占据页面；读取/网络错误仍通过 notice 显示。
   showNotice("");
 
-  if(a.unconfirmedRecharges.length > 0 && !$("rechargeModal").classList.contains("show")){
-    openRechargePrompt(a.unconfirmedRecharges[0]);
-  }
+  updateRechargeButton(rechargeAdjustments);
 
   renderSchoolStyle(a,rows);
   renderCharts(rows,a);
@@ -1866,8 +1905,11 @@ async function refresh(showSuccess=false){
   setStatus("正在读取","loading");
 
   try{
-    const rows = await loadData();
-    render(rows);
+    const [rows,rechargeAdjustments] = await Promise.all([
+      loadData(),
+      loadRechargeAdjustments()
+    ]);
+    render(rows,rechargeAdjustments);
     if(showSuccess) showToast(`${currentRoom().name} 刷新成功，当前余额 ${money(rows.at(-1).balance)} 元`);
   }catch(error){
     console.error(error);
@@ -1911,13 +1953,39 @@ function exportCsv(){
 }
 
 
-function openRechargePrompt(item){
-  pendingRechargeInterval = item;
+function pendingRechargeList(){
+  return currentRechargeAdjustments.filter(
+    item => item.status === "pending"
+  );
+}
+
+function updateRechargeButton(adjustments=currentRechargeAdjustments){
+  const count = adjustments.filter(
+    item => item.status === "pending"
+  ).length;
+
+  const badge = $("rechargePendingBadge");
+  badge.textContent = String(count);
+  badge.classList.toggle("hidden", count === 0);
+}
+
+function openRechargeManager(){
+  const pending = pendingRechargeList();
+
+  if(!pending.length){
+    showToast(`${currentRoom().name} 暂无待确认充值`);
+    return;
+  }
+
+  pendingRechargeAdjustment = pending[0];
+
+  const item = pendingRechargeAdjustment;
   $("rechargePrompt").textContent =
-    `${currentRoom().name}：检测到 ${cnTime(item.current.created_at,true)} 余额从 `
-    + `${money(item.previous.balance)} 元上升到 ${money(item.current.balance)} 元。`
-    + ` 余额净增加 ${money(item.inferred)} 元。请输入这次实际充值金额，`
-    + `系统将重新计算该区间真实用电。`;
+    `${currentRoom().name}：${cnTime(item.detected_at,true)} 检测到余额从 `
+    + `${money(item.previous_balance)} 元上升到 ${money(item.current_balance)} 元，`
+    + `净增加 ${money(item.observed_increase)} 元。`
+    + ` 当前共有 ${pending.length} 条待校准记录。请输入这次实际充值金额。`;
+
   $("rechargeAmount").value = "";
   $("rechargeModal").classList.add("show");
   $("rechargeModal").setAttribute("aria-hidden","false");
@@ -1927,11 +1995,12 @@ function openRechargePrompt(item){
 function closeRechargePrompt(){
   $("rechargeModal").classList.remove("show");
   $("rechargeModal").setAttribute("aria-hidden","true");
-  pendingRechargeInterval = null;
+  pendingRechargeAdjustment = null;
 }
 
-function confirmRechargeAmount(){
-  if(!pendingRechargeInterval) return;
+async function confirmRechargeAmount(){
+  if(!pendingRechargeAdjustment) return;
+
   const amount = Number($("rechargeAmount").value);
 
   if(!Number.isFinite(amount) || amount <= 0 || amount > 10000){
@@ -1939,8 +2008,7 @@ function confirmRechargeAmount(){
     return;
   }
 
-  const minimum = pendingRechargeInterval.current.balance
-    - pendingRechargeInterval.previous.balance;
+  const minimum = Number(pendingRechargeAdjustment.observed_increase);
 
   if(amount + BALANCE_EPSILON < minimum){
     showToast(
@@ -1950,25 +2018,45 @@ function confirmRechargeAmount(){
     return;
   }
 
-  const confirmations = loadRechargeConfirmations();
-  confirmations[pendingRechargeInterval.key] = {
-    amount:Number(amount.toFixed(2)),
-    confirmed_at:new Date().toISOString()
-  };
-  saveRechargeConfirmations(confirmations);
+  const saveButton = $("saveRechargeBtn");
+  saveButton.disabled = true;
+  saveButton.textContent = "保存中…";
 
-  const correctedUsage =
-    pendingRechargeInterval.previous.balance
-    + amount
-    - pendingRechargeInterval.current.balance;
+  try{
+    await rechargeRequest(
+      {
+        id:`eq.${pendingRechargeAdjustment.id}`,
+        status:"eq.pending"
+      },
+      {
+        method:"PATCH",
+        headers:{"Prefer":"return=representation"},
+        body:{
+          actual_recharge:Number(amount.toFixed(2)),
+          status:"confirmed",
+          confirmed_at:new Date().toISOString()
+        }
+      }
+    );
 
-  closeRechargePrompt();
-  showToast(
-    `已确认充值 ${money(amount)} 元，校正该区间用电 ${money(correctedUsage)} 元`
-  );
+    const correctedUsage =
+      Number(pendingRechargeAdjustment.previous_balance)
+      + amount
+      - Number(pendingRechargeAdjustment.current_balance);
 
-  if(currentRows.length){
-    render(currentRows);
+    closeRechargePrompt();
+
+    showToast(
+      `已确认充值 ${money(amount)} 元，校正该区间用电 ${money(correctedUsage)} 元`
+    );
+
+    await refresh(false);
+  }catch(error){
+    console.error(error);
+    showToast(error.message,true);
+  }finally{
+    saveButton.disabled = false;
+    saveButton.textContent = "确认校准";
   }
 }
 
@@ -2002,11 +2090,14 @@ $("roomPicker").addEventListener("change",async event=>{
   selectedUsageMonth = null;
   selectedUsageYear = null;
   currentRows = [];
+  currentRechargeAdjustments = [];
   currentAnalysis = null;
+  updateRechargeButton([]);
 
   await refresh(false);
 });
 
+$("rechargeManageBtn").addEventListener("click",openRechargeManager);
 $("saveRechargeBtn").addEventListener("click",confirmRechargeAmount);
 $("skipRechargeBtn").addEventListener("click",closeRechargePrompt);
 
